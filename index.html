@@ -29,6 +29,7 @@
     }
     #info { font-size: 0.85rem; font-weight: bold; color: #333; }
     #driverInfo { font-size: 0.72rem; color: #666; margin-top: 4px; }
+    #eta { font-size: 0.8rem; color: #e74c3c; font-weight: bold; margin-top: 4px; }
   </style>
 </head>
 <body>
@@ -55,6 +56,7 @@
   </select>
   <div id="info">🚌 Select a bus to track</div>
   <div id="driverInfo"></div>
+  <div id="eta"></div>
 </div>
 
 <div id="map"></div>
@@ -64,16 +66,20 @@
 <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
 
 <script>
-  const firebaseConfig = {
+  firebase.initializeApp({
     databaseURL: "https://college-bus-tracker-11fce-default-rtdb.firebaseio.com"
-  };
-  firebase.initializeApp(firebaseConfig);
+  });
   const db = firebase.database();
 
-  // Map
-  const map = L.map('map').setView([15.8500, 74.5000], 13);
+  const map = L.map('map', {
+    center: [15.8300, 74.5100],
+    zoom: 13,
+    minZoom: 12,
+    maxZoom: 17,
+    maxBounds: [[15.6200, 74.3800],[15.9600, 74.6500]],
+    maxBoundsViscosity: 0.5
+  });
 
-  // Try multiple tile servers
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '© OpenStreetMap'
@@ -88,73 +94,4 @@
     bus6:  { name: "Bus 6 - Vadagaon", driver: "V. S. Kambar", phone: "9663763819", time: "7:50 AM" },
     bus7:  { name: "Bus 7 - Khanapur", driver: "New Staff", phone: "—", time: "7:40 AM" },
     bus8:  { name: "Bus 8 - CBT/RTO", driver: "Vinod Arjun Patil", phone: "7338667662", time: "7:50 AM" },
-    bus9:  { name: "Bus 9 - Marihal", driver: "Ravi Dandagal", phone: "8197297335", time: "9:00 AM" },
-    bus10: { name: "Bus 10 - Khanapur", driver: "Bharama D", phone: "9985166439", time: "9:00 AM" },
-    bus11: { name: "Bus 11 - RC Nagar", driver: "Manjunath Mailannavar", phone: "9972781413", time: "7:50 AM" },
-    bus12: { name: "Bus 12 - Shahu Nagar", driver: "Praveen Shivaji Tupare", phone: "9902949685", time: "7:40 AM" },
-    bus13: { name: "Bus 13 - Uchagoan", driver: "Bharat N. Dhangavde", phone: "9844614143", time: "7:30 AM" },
-    bus14: { name: "Bus 14 - Shahapur", driver: "Sanjay Tarihalkar", phone: "9886867705", time: "7:50 AM" },
-    bus15: { name: "Bus 15 - Kakati", driver: "C. I. Sangammanavar", phone: "9008808351", time: "7:40 AM" },
-    bus16: { name: "Bus 16 - Ramteerth Nagar", driver: "Babu P. Chalvatkar", phone: "9686149872", time: "7:50 AM" }
-  };
-
-  // Stop markers
-  const stops = [
-  { name: "KLS GIT College", lat: 15.8155, lng: 74.4868 },
-  { name: "Mahantesh Nagar", lat: 15.8734, lng: 74.5350 },
-  { name: "Hanuman Nagar", lat: 15.8765, lng: 74.4862 },
-  { name: "Vadagaon", lat: 15.8365, lng: 74.5234 },
-  { name: "Kakati", lat: 15.9318, lng: 74.5270 },
-  { name: "Shahapur", lat: 15.8461, lng: 74.5167 },
-  { name: "Bhagya Nagar", lat: 15.8288, lng: 74.5066 },
-  { name: "Shahu Nagar", lat: 15.8927, lng: 74.5126 },
-  { name: "Khanapur", lat: 15.6452, lng: 74.5214 },
-  { name: "Channamma Circle", lat: 15.8673, lng: 74.5116 },
-  { name: "RTO", lat: 15.8964, lng: 74.5425 },
-  { name: "Ramteerth Nagar", lat: 15.8907, lng: 74.5433 },
-  { name: "Marihal", lat: 15.8801, lng: 74.5607 },
-  { name: "Indal Colony", lat: 15.9029, lng: 74.5250 },
-  { name: "Sambra", lat: 15.8642, lng: 74.6107 },
-  { name: "Machche", lat: 15.7875, lng: 74.4727 },
-  { name: "Tilakwadi", lat: 15.8373, lng: 74.5014 },
-  { name: "Angol", lat: 15.8197, lng: 74.5020 },
-  { name: "Rani Chennamma Nagar", lat: 15.8276, lng: 74.4899 }
-];
-  stops.forEach((stop, i) => {
-    const color = i === 0 ? 'red' : 'blue';
-    const html = `<div style="background:${color};width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.5)"></div>`;
-    const icon = L.divIcon({ className: '', html, iconSize: [12,12], iconAnchor: [6,6] });
-    L.marker([stop.lat, stop.lng], { icon }).addTo(map).bindPopup('<b>🚏 ' + stop.name + '</b>');
-  });
-
-  let busMarker = null;
-  let currentListener = null;
-
-  function selectBus() {
-    const selectedBus = document.getElementById('busSelect').value;
-    if (!selectedBus) return;
-    const bus = busData[selectedBus];
-    document.getElementById('info').innerText = '🔍 Looking for ' + bus.name + '...';
-    document.getElementById('driverInfo').innerText = '👤 ' + bus.driver + '  📞 ' + bus.phone + '  ⏰ ' + bus.time;
-    if (busMarker) { map.removeLayer(busMarker); busMarker = null; }
-    if (currentListener) currentListener.off();
-    currentListener = db.ref('liveLocation/' + selectedBus);
-    currentListener.on('value', (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const { lat, lng } = data;
-        document.getElementById('info').innerText = '🟢 ' + bus.name + ' is LIVE!';
-        if (!busMarker) {
-          busMarker = L.marker([lat, lng]).addTo(map).bindPopup(bus.name).openPopup();
-        } else {
-          busMarker.setLatLng([lat, lng]);
-        }
-        map.setView([lat, lng], 15);
-      } else {
-        document.getElementById('info').innerText = '🔴 ' + bus.name + ' not live yet';
-      }
-    });
-  }
-</script>
-</body>
-</html>
+    bus9:  { name: "Bus 9 - Mariha
