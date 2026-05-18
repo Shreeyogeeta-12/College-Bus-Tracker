@@ -2,6 +2,10 @@
 <html>
 <head>
   <title>KLS GIT Bus Tracker</title>
+  <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1a73e8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Bus Tracker">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -197,6 +201,13 @@
         document.getElementById('eta').innerText = '';
       }
     });
+  }
+</script>
+  <script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js')
+      .then(() => console.log('SW registered'))
+      .catch(() => console.log('SW failed'));
   }
 </script>
 </body>
