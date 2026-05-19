@@ -40,23 +40,22 @@
 
 <div id="topbar">
   <select id="busSelect" onchange="selectBus()">
-    <option value="">-- Select Your Bus --</option>
-    <option value="bus1">Bus 1 - Mahantesh Nagar</option>
-    <option value="bus2">Bus 2 - Kakati / Hanuman Nagar</option>
-    <option value="bus3">Bus 3 - Hanuman Nagar</option>
-    <option value="bus4">Bus 4 - Vadagaon</option>
-    <option value="bus5">Bus 5 - Marihal / RC Nagar</option>
-    <option value="bus6">Bus 6 - Vadagaon</option>
-    <option value="bus7">Bus 7 - Khanapur</option>
-    <option value="bus8">Bus 8 - CBT / RTO</option>
-    <option value="bus9">Bus 9 - Marihal</option>
-    <option value="bus10">Bus 10 - Khanapur</option>
-    <option value="bus11">Bus 11 - RC Nagar</option>
-    <option value="bus12">Bus 12 - Shahu Nagar</option>
-    <option value="bus13">Bus 13 - Uchagoan</option>
-    <option value="bus14">Bus 14 - Shahapur</option>
-    <option value="bus15">Bus 15 - Kakati</option>
-    <option value="bus16">Bus 16 - Ramteerth Nagar</option>
+<option value="bus1">Bus 1</option>
+<option value="bus2">Bus 2</option>
+<option value="bus3">Bus 3</option>
+<option value="bus4">Bus 4</option>
+<option value="bus5">Bus 5</option>
+<option value="bus6">Bus 6</option>
+<option value="bus7">Bus 7</option>
+<option value="bus8">Bus 8</option>
+<option value="bus9">Bus 9</option>
+<option value="bus10">Bus 10</option>
+<option value="bus11">Bus 11</option>
+<option value="bus12">Bus 12</option>
+<option value="bus13">Bus 13</option>
+<option value="bus14">Bus 14</option>
+<option value="bus15">Bus 15</option>
+<option value="bus16">Bus 16</option>
   </select>
   <div id="info">🚌 Select a bus to track</div>
   <div id="driverInfo"></div>
@@ -89,23 +88,23 @@
   attribution: '© OpenStreetMap © CARTO'
 }).addTo(map);
 
-  const busData = {
-    bus1:  { name: "Bus 1", driver: "Indrajeet Karvekar", phone: "9008625349", time: "7:30 AM" },
-    bus2:  { name: "Bus 2", driver: "Sushil H. Patil", phone: "7795135936", time: "7:50 AM" },
-    bus3:  { name: "Bus 3", driver: "Ragavendra Deepak N", phone: "8073035140", time: "7:50 AM" },
-    bus4:  { name: "Bus 4", driver: "Kannappa Baganal", phone: "9964810056", time: "7:50 AM" },
-    bus5:  { name: "Bus 5", driver: "S. M. Kalasekar", phone: "9164332711", time: "7:30 AM" },
-    bus6:  { name: "Buus 6", driver: "V. S. Kambar", phone: "9663763819", time: "7:50 AM" },
-    bus7:  { name: "Bus 7", driver: "New Staff", phone: "—", time: "7:40 AM" },
-    bus8:  { name: "Bus 8", driver: "Vinod Arjun Patil", phone: "7338667662", time: "7:50 AM" },
-    bus9:  { name: "Bus 9", driver: "Ravi Dandagal", phone: "8197297335", time: "9:00 AM" },
-    bus10: { name: "Bus 10", driver: "Bharama D", phone: "9985166439", time: "9:00 AM" },
-    bus11: { name: "Bus 11", driver: "Manjunath Mailannavar", phone: "9972781413", time: "7:50 AM" },
-    bus12: { name: "Bus 12", driver: "Praveen Shivaji Tupare", phone: "9902949685", time: "7:40 AM" },
-    bus13: { name: "Bus 13", driver: "Bharat N. Dhangavde", phone: "9844614143", time: "7:30 AM" },
-    bus14: { name: "Bus 14", driver: "Sanjay Tarihalkar", phone: "9886867705", time: "7:50 AM" },
-    bus15: { name: "Bus 15", driver: "C. I. Sangammanavar", phone: "9008808351", time: "7:40 AM" },
-    bus16: { name: "Bus 16", driver: "Babu P. Chalvatkar", phone: "9686149872", time: "7:50 AM" }
+ const busData = {
+    bus1:  { name: "Bus 1 - Mahantesh Nagar", driver: "Indrajeet Karvekar", phone: "9008625349", time: "7:30 AM" },
+    bus2:  { name: "Bus 2 - Kakati/Hanuman Nagar", driver: "Sushil H. Patil", phone: "7795135936", time: "7:50 AM" },
+    bus3:  { name: "Bus 3 - Hanuman Nagar", driver: "Ragavendra Deepak N", phone: "8073035140", time: "7:50 AM" },
+    bus4:  { name: "Bus 4 - Vadagaon", driver: "Kannappa Baganal", phone: "9964810056", time: "7:50 AM" },
+    bus5:  { name: "Bus 5 - Marihal/RC Nagar", driver: "S. M. Kalasekar", phone: "9164332711", time: "7:30 AM" },
+    bus6:  { name: "Bus 6 - Vadagaon", driver: "V. S. Kambar", phone: "9663763819", time: "7:50 AM" },
+    bus7:  { name: "Bus 7 - Khanapur", driver: "New Staff", phone: "—", time: "7:40 AM" },
+    bus8:  { name: "Bus 8 - CBT/RTO", driver: "Vinod Arjun Patil", phone: "7338667662", time: "7:50 AM" },
+    bus9:  { name: "Bus 9 - Marihal", driver: "Ravi Dandagal", phone: "8197297335", time: "9:00 AM" },
+    bus10: { name: "Bus 10 - Khanapur", driver: "Bharama D", phone: "9985166439", time: "9:00 AM" },
+    bus11: { name: "Bus 11 - RC Nagar", driver: "Manjunath Mailannavar", phone: "9972781413", time: "7:50 AM" },
+    bus12: { name: "Bus 12 - Shahu Nagar", driver: "Praveen Shivaji Tupare", phone: "9902949685", time: "7:40 AM" },
+    bus13: { name: "Bus 13 - Uchagoan", driver: "Bharat N. Dhangavde", phone: "9844614143", time: "7:30 AM" },
+    bus14: { name: "Bus 14 - Shahapur", driver: "Sanjay Tarihalkar", phone: "9886867705", time: "7:50 AM" },
+    bus15: { name: "Bus 15 - Kakati", driver: "C. I. Sangammanavar", phone: "9008808351", time: "7:40 AM" },
+    bus16: { name: "Bus 16 - Ramteerth Nagar", driver: "Babu P. Chalvatkar", phone: "9686149872", time: "7:50 AM" }
   };
 
   const stops = [
