@@ -107,38 +107,6 @@
     bus16: { name: "Bus 16 ", driver: "Babu P. Chalvatkar", phone: "9686149872", time: "7:50 AM" }
   };
 
-  const stops = [
-    { name: "KLS GIT College", lat: 15.8155, lng: 74.4868 },
-    { name: "Mahantesh Nagar", lat: 15.8694, lng: 74.5291 },
-    { name: "Ramteerth Nagar", lat: 15.8907, lng: 74.5433 },
-    { name: "Hanuman Nagar", lat: 15.8765, lng: 74.4862 },
-    { name: "RC Nagar", lat: 15.8276, lng: 74.4899 },
-    { name: "Vadagaon", lat: 15.8365, lng: 74.5234 },
-    { name: "Kakati", lat: 15.9318, lng: 74.5270 },
-    { name: "Shahapur", lat: 15.8461, lng: 74.5167 },
-    { name: "Bhagya Nagar", lat: 15.8288, lng: 74.5066 },
-    { name: "Shahu Nagar", lat: 15.8927, lng: 74.5126 },
-    { name: "Khanapur", lat: 15.6452, lng: 74.5214 },
-    { name: "Channamma Circle", lat: 15.8673, lng: 74.5116 },
-    { name: "RTO", lat: 15.8964, lng: 74.5425 },
-    { name: "Sambra", lat: 15.8642, lng: 74.6107 },
-    { name: "Machhe", lat: 15.7875, lng: 74.4727 },
-    { name: "Marihal", lat: 15.8801, lng: 74.5607 },
-    { name: "Uchagaon", lat: 15.8883, lng: 74.4320 },
-    { name: "Indal Colony", lat: 15.9029, lng: 74.5250 },
-    { name: "Azam Nagar", lat: 15.8849, lng: 74.5133 },
-    { name: "Fish Market", lat: 15.8608, lng: 74.5181 },
-    { name: "Tilakwadi", lat: 15.8373, lng: 74.5014 },
-    { name: "Sadashiv Nagar", lat: 15.8797, lng: 74.5081 },
-    { name: "TV Centre", lat: 15.8800, lng: 74.4985 },
-    { name: "Gandhi Nagar", lat: 15.8629, lng: 74.5338 },
-    { name: "Goa Ves", lat: 15.8407, lng: 74.5101 },
-    { name: "RPD Cross", lat: 15.8345, lng: 74.5048 },
-    { name: "KLE Engg College", lat: 15.8202, lng: 74.4985 },
-    { name: "Raghunath Peth", lat: 15.8196, lng: 74.5037 },
-    { name: "Guru Prasad Colony", lat: 15.8318, lng: 74.4827 }
-  ];
-
   stops.forEach((stop, i) => {
     const color = i === 0 ? 'red' : 'blue';
     const html = `<div style="background:${color};width:10px;height:10px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.5)"></div>`;
