@@ -5,48 +5,47 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{background:#0a0e1a;color:white;font-family:Arial;min-height:100vh;padding-bottom:30px}
-    .header{background:#0d1526;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e2a45}
-    .htitle{font-size:1.1rem;font-weight:bold;color:#4da6ff}
-    .hsub{font-size:0.7rem;color:#8892b0}
-    .clock{font-size:1.3rem;font-weight:bold;color:#4da6ff;font-family:monospace}
+    body{background:#ffffff;color:#111111;font-family:Arial;min-height:100vh;padding-bottom:30px}
+    .header{background:#f5f5f5;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #dddddd}
+    .htitle{font-size:1.1rem;font-weight:bold;color:#1a1a1a}
+    .hsub{font-size:0.7rem;color:#666666}
+    .clock{font-size:1.3rem;font-weight:bold;color:#1a1a1a;font-family:monospace}
     .content{padding:14px;display:flex;flex-direction:column;gap:14px}
-    .card{background:#0d1526;border-radius:14px;padding:16px;border:1px solid #1e2a45}
-    .card-title{font-size:0.7rem;letter-spacing:2px;color:#8892b0;margin-bottom:12px}
-    .flabel{font-size:0.72rem;color:#8892b0;margin-bottom:6px}
-    .fvalue{background:#151f35;border-radius:8px;padding:12px;font-size:0.9rem;color:#ccd6f6;margin-bottom:12px;border:1px solid #1e2a45}
-    select{width:100%;background:#151f35;color:white;border:1px solid #1e2a45;border-radius:8px;padding:12px;font-size:0.9rem;margin-bottom:12px}
+    .card{background:#f9f9f9;border-radius:14px;padding:16px;border:1px solid #dddddd}
+    .card-title{font-size:0.7rem;letter-spacing:2px;color:#666666;margin-bottom:12px}
+    .flabel{font-size:0.72rem;color:#666666;margin-bottom:6px}
+    select{width:100%;background:#ffffff;color:#111111;border:1px solid #cccccc;border-radius:8px;padding:12px;font-size:0.9rem;margin-bottom:12px}
     .circle-wrap{display:flex;flex-direction:column;align-items:center;gap:16px;padding:10px 0}
-    .big-circle{width:160px;height:160px;border-radius:50%;background:#151f35;border:3px solid #2a3a5c;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all 0.3s}
-    .big-circle.live{border-color:#00ff88;box-shadow:0 0 30px rgba(0,255,136,0.3)}
+    .big-circle{width:160px;height:160px;border-radius:50%;background:#f0f0f0;border:3px solid #cccccc;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all 0.3s}
+    .big-circle.live{border-color:#16a34a;box-shadow:0 0 30px rgba(22,163,74,0.25)}
     .pin{font-size:2.5rem;margin-bottom:8px}
-    .ctext{font-size:0.75rem;font-weight:bold;letter-spacing:2px;color:#8892b0}
-    .big-circle.live .ctext{color:#00ff88}
-    .gdot{width:40px;height:40px;border-radius:50%;background:#00ff88;margin-bottom:8px;display:none;box-shadow:0 0 15px #00ff88}
+    .ctext{font-size:0.75rem;font-weight:bold;letter-spacing:2px;color:#666666}
+    .big-circle.live .ctext{color:#16a34a}
+    .gdot{width:40px;height:40px;border-radius:50%;background:#16a34a;margin-bottom:8px;display:none;box-shadow:0 0 15px rgba(22,163,74,0.4)}
     .big-circle.live .gdot{display:block}
     .big-circle.live .pin{display:none}
-    .badge{padding:8px 20px;border-radius:20px;font-size:0.8rem;font-weight:bold;border:1px solid #2a3a5c;color:#8892b0;display:flex;align-items:center;gap:8px}
-    .badge.live{border-color:#00ff88;color:#00ff88}
-    .bdot{width:8px;height:8px;border-radius:50%;background:#555}
-    .bdot.live{background:#00ff88}
+    .badge{padding:8px 20px;border-radius:20px;font-size:0.8rem;font-weight:bold;border:1px solid #cccccc;color:#666666;display:flex;align-items:center;gap:8px}
+    .badge.live{border-color:#16a34a;color:#16a34a}
+    .bdot{width:8px;height:8px;border-radius:50%;background:#aaaaaa}
+    .bdot.live{background:#16a34a}
     .irow{display:flex;gap:10px}
-    .icard{flex:1;background:#0d1526;border-radius:12px;padding:14px;border:1px solid #1e2a45}
-    .ilabel{font-size:0.65rem;letter-spacing:1px;color:#8892b0;margin-bottom:6px}
-    .ivalue{font-size:1.3rem;font-weight:bold;color:#4da6ff}
-    .ivalue.g{color:#00ff88}
-    .gbox{background:#0d1526;border-radius:12px;padding:14px;border:1px solid #1e2a45}
-    .glabel{font-size:0.65rem;letter-spacing:1px;color:#8892b0;margin-bottom:6px}
-    .gval{font-size:0.9rem;font-weight:bold;color:#ccd6f6}
-    .rstop{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #1e2a45}
+    .icard{flex:1;background:#f9f9f9;border-radius:12px;padding:14px;border:1px solid #dddddd}
+    .ilabel{font-size:0.65rem;letter-spacing:1px;color:#666666;margin-bottom:6px}
+    .ivalue{font-size:1.3rem;font-weight:bold;color:#1a1a1a}
+    .ivalue.g{color:#16a34a}
+    .gbox{background:#f9f9f9;border-radius:12px;padding:14px;border:1px solid #dddddd}
+    .glabel{font-size:0.65rem;letter-spacing:1px;color:#666666;margin-bottom:6px}
+    .gval{font-size:0.9rem;font-weight:bold;color:#111111}
+    .rstop{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #eeeeee}
     .rstop:last-child{border-bottom:none}
-    .sdot{width:12px;height:12px;border-radius:50%;background:#2a3a5c;flex-shrink:0}
-    .sdot.cur{background:#f39c12;box-shadow:0 0 8px #f39c12}
-    .sname{flex:1;font-size:0.85rem;color:#ccd6f6}
-    .sstatus{font-size:0.72rem;color:#8892b0}
+    .sdot{width:12px;height:12px;border-radius:50%;background:#cccccc;flex-shrink:0}
+    .sdot.cur{background:#f39c12;box-shadow:0 0 8px rgba(243,156,18,0.4)}
+    .sname{flex:1;font-size:0.85rem;color:#111111}
+    .sstatus{font-size:0.72rem;color:#888888}
     .sstatus.here{color:#f39c12;font-weight:bold}
-    .sbox{background:#0d1526;border-radius:12px;padding:14px;border:1px solid #1e2a45}
-    .stitle{font-size:0.8rem;color:#4da6ff;margin-bottom:10px}
-    .slink{background:#151f35;border-radius:8px;padding:10px 12px;font-size:0.75rem;color:#8892b0;word-break:break-all}
+    .sbox{background:#f9f9f9;border-radius:12px;padding:14px;border:1px solid #dddddd}
+    .stitle{font-size:0.8rem;color:#1a1a1a;margin-bottom:10px;font-weight:bold}
+    .slink{background:#ffffff;border-radius:8px;padding:10px 12px;font-size:0.75rem;color:#555555;word-break:break-all;border:1px solid #dddddd}
   </style>
 </head>
 <body>
@@ -66,33 +65,18 @@
 
   <div class="card">
     <div class="card-title">⚙️ YOUR ASSIGNMENT</div>
+    <div class="flabel">Trip / Shift</div>
+    <select id="tripSelect" onchange="onTripChange()">
+      <option value="">— Select your shift —</option>
+      <option value="morning730">Morning Pickup — 7:30 AM</option>
+      <option value="morning900">Morning Pickup — 9:00 AM</option>
+      <option value="drop130">Afternoon Drop — 1:30 PM</option>
+      <option value="drop400">Evening Drop — 4:00 PM</option>
+      <option value="drop515">Evening Drop — 5:15 PM</option>
+    </select>
     <div class="flabel">Bus Number</div>
     <select id="busSelect" onchange="onBusChange()">
-      <option value="">— Select your bus —</option>
-      <option value="bus1">Mahantesh Nagar</option>
-      <option value="bus2">Ramteerth Nagar</option>
-      <option value="bus3">Hanuman Nagar</option>
-      <option value="bus4">Vadagaon</option>
-      <option value="bus5">RC Nagar</option>
-      <option value="bus6">Vadagaon</option>
-      <option value="bus7">Kakati</option>
-      <option value="bus8">CBT/Bogar Ves</option>
-      <option value="bus9">Bhagya Nagar</option>
-      <option value="bus10">Khanapur</option>
-      <option value="bus11">RC Nagar</option>
-      <option value="bus12">Shahu Nagar</option>
-      <option value="bus13">Uchagoan</option>
-      <option value="bus14">Shahapur</option>
-      <option value="bus15">Kakati</option>
-      <option value="bus16">Ramteerth Nagar</option>
-    </select>
-    <div class="flabel">Trip</div>
-    <select id="tripSelect">
-      <option value="morning">Morning Pickup — 7:30 AM</option>
-      <option value="morning">Morning Pickup — 9:00 AM</option>
-      <option value="drop1">Afternoon Drop — 1:30 PM</option>
-      <option value="drop2">Evening Drop — 4:00 PM</option>
-      <option value="drop3">Evening Drop — 5:15 PM</option>
+      <option value="">— Select shift first —</option>
     </select>
   </div>
 
@@ -128,7 +112,7 @@
 
   <div class="card">
     <div class="card-title">🗺️ ROUTE PROGRESS</div>
-    <div id="routeList"><p style="color:#8892b0;font-size:0.85rem">Select a bus to see route</p></div>
+    <div id="routeList"><p style="color:#888888;font-size:0.85rem">Select shift and bus to see route</p></div>
   </div>
 
   <div class="sbox">
@@ -146,38 +130,189 @@
   });
   const db = firebase.database();
 
+  // Clock
   setInterval(()=>{
     const n=new Date();
     document.getElementById('clock').innerText=
       String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
   },1000);
 
-  const routes={
-    bus1:["KLS GIT","Bogar Ves","Fish Market","Arun Theatre","CBT","RTO","Mahantesh Nagar"],
-    bus2:["KLS GIT","RC Nagar","Utsav","Channamma Circle","Mahantesh Nagar","Ramteerth Nagar"],
-    bus3:["KLS GIT","Bogar Ves","Congress Road","Sadashiv Nagar","TV Centre","Hanuman Nagar"],
-    bus4:["KLS GIT","RPD","Goa Ves","Nath Pai Circle","Vadagaon"],
-    bus5:["KLS GIT","Fort Circle","Gandhi Nagar","Shindoli Cross","Marihal","RC Nagar"],
-    bus6:["KLS GIT","RPD","Goa Ves","Nath Pai Circle","Vadagaon"],
-    bus7:["KLS GIT","Machche","BCM Hostel","Khanapur"],
-    bus8:["KLS GIT","Goa Ves","Fish Market","Channamma Circle","RTO","CBT","Bogar Ves"],
-    bus9:["KLS GIT","KLE Engg College","Raghunath Peth","Bhagya Nagar"],
-    bus10:["KLS GIT","Machche","BCM Hostel","Khanapur"],
-    bus11:["KLS GIT","Guru Prasad Colony","Mandoli Road","RC Nagar"],
-    bus12:["KLS GIT","Congress Road","Camp","Nehru Nagar","Shahu Nagar"],
-    bus13:["KLS GIT","Arun Theatre","Fish Market","Vinayak Nagar","Sulga","Uchagoan"],
-    bus14:["KLS GIT","Utsav","RPD","Goa Ves","Tukaram Bank","Shahapur"],
-    bus15:["KLS GIT","Bogar Ves","Channamma Circle","Azam Nagar","Indal","Kakati"],
-    bus16:["KLS GIT","Bogar Ves","Channamma Circle","Srinagar Garden","Ganesh Chouk","Ramteerth Nagar"]
+  // ── BUS LIST PER SHIFT ────────────────────────────────
+  // Each bus has a UNIQUE id so routes object keys don't clash
+  const shiftBuses = {
+    morning730: [
+      { id:"m730_b1",  label:"Bus — Vadagaon (via Nath Pai Circle)" },
+      { id:"m730_b2",  label:"Bus — Vadagaon (alt route)" },
+      { id:"m730_b3",  label:"Bus — Ramtheerth Nagar" },
+      { id:"m730_b4",  label:"Bus — Mahantesh Nagar (Harsha Hotel)" },
+      { id:"m730_b5",  label:"Bus — Hanuman Nagar" },
+      { id:"m730_b6",  label:"Bus — Ganeshpur" },
+      { id:"m730_b7",  label:"Bus — Shahapur" },
+      { id:"m730_b8",  label:"Bus — Kakati" },
+      { id:"m730_b9",  label:"Bus — Bhagya Nagar" },
+      { id:"m730_b10", label:"Bus — Marihal" },
+      { id:"m730_b11", label:"Bus — CBT" },
+      { id:"m730_b12", label:"Bus — RC Nagar" },
+      { id:"m730_b13", label:"Bus — Shahu Nagar" },
+      { id:"m730_b14", label:"Bus — Khanapur" }
+    ],
+    morning900: [
+      { id:"m900_b1",  label:"Bus — Vadagaon (via Nath Pai Circle)" },
+      { id:"m900_b2",  label:"Bus — Vadagaon (alt route)" },
+      { id:"m900_b3",  label:"Bus — Ramteerth Nagar" },
+      { id:"m900_b4",  label:"Bus — Mahantesh Nagar (Harsha Hotel)" },
+      { id:"m900_b5",  label:"Bus — Hanuman Nagar" },
+      { id:"m900_b6",  label:"Bus — Ganeshpur" },
+      { id:"m900_b7",  label:"Bus — Shahapur" },
+      { id:"m900_b8",  label:"Bus — Kakati" },
+      { id:"m900_b9",  label:"Bus — Bhagya Nagar" },
+      { id:"m900_b10", label:"Bus — Marihal" },
+      { id:"m900_b11", label:"Bus — CBT" },
+      { id:"m900_b12", label:"Bus — RC Nagar" },
+      { id:"m900_b13", label:"Bus — Shahu Nagar" },
+      { id:"m900_b14", label:"Bus — Khanapur" }
+    ],
+    drop130: [
+      { id:"d130_b1", label:"Bus — Vadagaon & Bhagya Nagar" },
+      { id:"d130_b2", label:"Bus — RC Nagar" },
+      { id:"d130_b3", label:"Bus — Mahantesh Nagar" },
+      { id:"d130_b4", label:"Bus — Hanuman Nagar & Ganeshpur" },
+      { id:"d130_b5", label:"Bus — CBT" },
+      { id:"d130_b6", label:"Bus — Kakati" },
+      { id:"d130_b7", label:"Bus — Sambra & Marihal" },
+      { id:"d130_b8", label:"Bus — Shahapur" },
+      { id:"d130_b9", label:"Bus — Khanapur" }
+    ],
+    drop400: [
+      { id:"d400_b1", label:"Bus — Kakati" },
+      { id:"d400_b2", label:"Bus — RC Nagar" },
+      { id:"d400_b3", label:"Bus — Shahapur" },
+      { id:"d400_b4", label:"Bus — Hanuman Nagar & Ganeshpur" },
+      { id:"d400_b5", label:"Bus — Mahantesh Nagar" },
+      { id:"d400_b6", label:"Bus — Vadagaon" },
+      { id:"d400_b7", label:"Bus — Bhagya Nagar" },
+      { id:"d400_b8", label:"Bus — CBT" }
+    ],
+    drop515: [
+      { id:"d515_b1",  label:"Bus — Kakati" },
+      { id:"d515_b2",  label:"Bus — Vadagaon" },
+      { id:"d515_b3",  label:"Bus — RC Nagar" },
+      { id:"d515_b4",  label:"Bus — Shahapur" },
+      { id:"d515_b5",  label:"Bus — CBT" },
+      { id:"d515_b6",  label:"Bus — Bhagya Nagar" },
+      { id:"d515_b7",  label:"Bus — Ganeshpur" },
+      { id:"d515_b8",  label:"Bus — Mahantesh Nagar" },
+      { id:"d515_b9",  label:"Bus — Hanuman Nagar" },
+      { id:"d515_b10", label:"Bus — Marihal" },
+      { id:"d515_b11", label:"Bus — Khanapur" }
+    ]
   };
 
-  let isTracking=false, watchId=null, gpsCount=0, selBus='';
+  // ── ROUTES PER BUS (unique keys now — no overwriting!) ──
+  const routes = {
+    // MORNING 7:30
+    m730_b1:  ["Vadagaon","Nath Pai Circle","Goa Ves","RPD Cross","KLS GIT"],
+    m730_b2:  ["Vadagaon","Channamma Circle","CBT","KLS GIT"],
+    m730_b3:  ["Surabhi Hotel","LSA School","Kanbargi","Ganesh Circle","Uday School Stop 0","Uday school stop 1","Stadium","Harsha hotel","Janata plot","Sai mandir","Shrinagar garden","Shri nagar stop","SGBIT","Kannada Bhavan ","Ramdev","Chennamma circle","Bogarves","KLS GIT"],
+    m730_b4:  ["Harsha Hotel","Janata plot","More Store","Nandini Dairy","Sidnal Stop","Mahantesh Nagar 1st Stop","Fort lake","RTO","Chennamma Circle","Bogarves","KLS GIT"],
+    m730_b5:  ["Ganesh Temple","Kuvempu Nagar","KLE School","Sahaydri Nagar","Kumarswami Layout","Hanuman Nagar 2nd Stop","Hanuman Nagar Circle","Sadashiv Nagar","Channamma Circle","Bogarves","Congress Road","KLS GIT"],
+    m730_b6:  ["Ganeshpur","Channamma Circle","CBT","KLS GIT"],
+    m730_b7:  ["Shahapur","Tukaram Bank","Goa Ves","RPD Cross","KLS GIT"],
+    m730_b8:  ["Kakati","Indal Colony","Azam Nagar","Channamma Circle","KLS GIT"],
+    m730_b9:  ["Bhagya Nagar","Raghunath Peth","KLE Engg College","KLS GIT"],
+    m730_b10: ["Marihal","Gandhi Nagar","Fort Circle","KLS GIT"],
+    m730_b11: ["CBT","RTO","Channamma Circle","Fish Market","KLS GIT"],
+    m730_b12: ["RC Nagar","Mandoli Road","Guru Prasad Colony","KLS GIT"],
+    m730_b13: ["Shahu Nagar","Nehru Nagar","Camp","Congress Road","KLS GIT"],
+    m730_b14: ["Khanapur","BCM Hostel","Machhe","KLS GIT"],
 
-  function onBusChange(){
-    selBus=document.getElementById('busSelect').value;
-    if(!selBus) return;
-    const r=routes[selBus];
-    document.getElementById('nextStop').innerText=r[r.length-1];
+    // MORNING 9:00
+    m900_b1:  ["Vadagaon","Nath Pai Circle","Goa Ves","RPD Cross","KLS GIT"],
+    m900_b2:  ["Vadagaon","Channamma Circle","CBT","KLS GIT"],
+    m900_b3:  ["Surabhi Hotel","LSA School","Kanbargi","Ganesh Circle","Uday School Stop 0","Uday school stop 1","Stadium","Harsha hotel","Janata plot","Sai mandir","Shrinagar garden","Shri nagar stop","SGBIT","Kannada Bhavan ","Ramdev","Chennamma circle","Bogarves","KLS GIT"],
+    m900_b4:  ["Harsha Hotel","Janata plot","More Store","Nandini Dairy","Sidnal Stop","Mahantesh Nagar 1st Stop","Fort lake","RTO","Chennamma Circle","Bogarves","KLS GIT"],
+    m900_b5:  ["Hanuman Nagar","TV Centre","Sadashiv Nagar","Congress Road","KLS GIT"],
+    m900_b6:  ["Ganeshpur","Channamma Circle","CBT","KLS GIT"],
+    m900_b7:  ["Shahapur","Tukaram Bank","Goa Ves","RPD Cross","KLS GIT"],
+    m900_b8:  ["Kakati","Indal Colony","Azam Nagar","Channamma Circle","KLS GIT"],
+    m900_b9:  ["Bhagya Nagar","Raghunath Peth","KLE Engg College","KLS GIT"],
+    m900_b10: ["Marihal","Gandhi Nagar","Fort Circle","KLS GIT"],
+    m900_b11: ["CBT","RTO","Channamma Circle","Fish Market","KLS GIT"],
+    m900_b12: ["RC Nagar","Mandoli Road","Guru Prasad Colony","KLS GIT"],
+    m900_b13: ["Shahu Nagar","Nehru Nagar","Camp","Congress Road","KLS GIT"],
+    m900_b14: ["Khanapur","BCM Hostel","Machhe","KLS GIT"],
+
+    // DROP 1:30
+    d130_b1: ["KLS GIT","RPD Cross","Goa Ves","Nath Pai Circle","Vadagaon","Bhagya Nagar"],
+    d130_b2: ["KLS GIT","Guru Prasad Colony","Mandoli Road","RC Nagar"],
+    d130_b3: ["KLS GIT","Bogarves","Chennamma circle","RTO","Mahantesh Nagar","Sidnal stop","Nandini dairy","More stop","Kanbargi","Ganesh circle","Uday school","Harsha hotel ","Sai mandir","Shrinagar","SGBIT","Ramdev"],
+    d130_b4: ["KLS GIT","Congress Road","Sadashiv Nagar","TV Centre","Hanuman Nagar","Ganeshpur"],
+    d130_b5: ["KLS GIT","Fish Market","Channamma Circle","RTO","CBT"],
+    d130_b6: ["KLS GIT","Channamma Circle","Azam Nagar","Indal Colony","Kakati"],
+    d130_b7: ["KLS GIT","Fort Circle","Gandhi Nagar","Marihal","Sambra"],
+    d130_b8: ["KLS GIT","RPD Cross","Goa Ves","Tukaram Bank","Shahapur"],
+    d130_b9: ["KLS GIT","Machhe","BCM Hostel","Khanapur"],
+
+    // DROP 4:00
+    d400_b1: ["KLS GIT","Channamma Circle","Azam Nagar","Indal Colony","Kakati"],
+    d400_b2: ["KLS GIT","Guru Prasad Colony","Mandoli Road","RC Nagar"],
+    d400_b3: ["KLS GIT","RPD Cross","Goa Ves","Tukaram Bank","Shahapur"],
+    d400_b4: ["KLS GIT","Congress Road","Sadashiv Nagar","TV Centre","Hanuman Nagar","Ganeshpur"],
+    d400_b5:  ["KLS GIT","Bogarves","Chennamma circle","RTO","Mahantesh Nagar","Sidnal stop","Nandini dairy","More stop","Kanbargi","Ganesh circle","Uday school","Harsha hotel ","Sai mandir","Shrinagar","SGBIT","Ramdev"],
+    d400_b6: ["KLS GIT","RPD Cross","Goa Ves","Nath Pai Circle","Vadagaon"],
+    d400_b7: ["KLS GIT","KLE Engg College","Raghunath Peth","Bhagya Nagar"],
+    d400_b8: ["KLS GIT","Fish Market","Channamma Circle","RTO","CBT"],
+
+    // DROP 5:15
+    d515_b1:  ["KLS GIT","Channamma Circle","Azam Nagar","Indal Colony","Kakati"],
+    d515_b2:  ["KLS GIT","RPD Cross","Goa Ves","Nath Pai Circle","Vadagaon"],
+    d515_b3:  ["KLS GIT","Guru Prasad Colony","Mandoli Road","RC Nagar"],
+    d515_b4:  ["KLS GIT","RPD Cross","Goa Ves","Tukaram Bank","Shahapur"],
+    d515_b5:  ["KLS GIT","Fish Market","Channamma Circle","RTO","CBT"],
+    d515_b6:  ["KLS GIT","KLE Engg College","Raghunath Peth","Bhagya Nagar"],
+    d515_b7:  ["KLS GIT","CBT","Channamma Circle","Ganeshpur"],
+    d515_b8:  ["KLS GIT","Bogarves","Chennamma circle","RTO","Mahantesh Nagar","Sidnal stop","Nandini dairy","More stop","Kanbargi","Ganesh circle","Uday school","Harsha hotel ","Sai mandir","Shrinagar","SGBIT","Ramdev"],
+    d515_b9:  ["KLS GIT","Congress Road","Sadashiv Nagar","TV Centre","Hanuman Nagar"],
+    d515_b10: ["KLS GIT","Fort Circle","Gandhi Nagar","Marihal"],
+    d515_b11: ["KLS GIT","Machhe","BCM Hostel","Khanapur"]
+  };
+
+  let isTracking=false, watchId=null, gpsCount=0;
+  let selBus='', selTrip='';
+
+  // ── TRIP CHANGE ───────────────────────────────────────
+  function onTripChange() {
+    selTrip = document.getElementById('tripSelect').value;
+    selBus  = '';
+    if(isTracking) stopTracking();
+
+    const busSelect = document.getElementById('busSelect');
+    busSelect.innerHTML = '<option value="">— Select your bus —</option>';
+
+    if(!selTrip) return;
+
+    const list = shiftBuses[selTrip] || [];
+    list.forEach(b => {
+      const opt = document.createElement('option');
+      opt.value = b.id;
+      opt.textContent = b.label;
+      busSelect.appendChild(opt);
+    });
+
+    document.getElementById('routeList').innerHTML =
+      '<p style="color:#888888;font-size:0.85rem">Select your bus to see route</p>';
+    document.getElementById('nextStop').innerText = '—';
+    document.getElementById('shareLink').innerText = 'Select a bus to generate link';
+  }
+
+  // ── BUS CHANGE ────────────────────────────────────────
+  function onBusChange() {
+    selBus = document.getElementById('busSelect').value;
+    if(!selBus || !selTrip) return;
+
+    const r = routes[selBus] || [];
+    document.getElementById('nextStop').innerText = r[r.length-1] || '—';
+
     let html='';
     r.forEach((s,i)=>{
       html+=`<div class="rstop">
@@ -186,34 +321,42 @@
         <div class="sstatus ${i===0?'here':''}">${i===0?'● Here':'Upcoming'}</div>
       </div>`;
     });
-    document.getElementById('routeList').innerHTML=html;
-    document.getElementById('shareLink').innerText='college-bus-tracker-alpha.vercel.app?bus='+selBus;
+    document.getElementById('routeList').innerHTML = html;
+    document.getElementById('shareLink').innerText =
+      'git-bus-tracker.vercel.app/index.html?bus='+selBus;
   }
 
-  function toggleTracking(){
-    if(!selBus){ alert('Please select your bus first!'); return; }
+  // ── TRACKING ──────────────────────────────────────────
+  function toggleTracking() {
+    if(!selBus)  { alert('Please select your bus first!');  return; }
+    if(!selTrip) { alert('Please select your shift first!'); return; }
     isTracking ? stopTracking() : startTracking();
   }
 
-  function startTracking(){
+  function startTracking() {
     isTracking=true;
     document.getElementById('bigCircle').classList.add('live');
     document.getElementById('ctext').innerText='SHARING LIVE';
     document.getElementById('badge').classList.add('live');
     document.getElementById('bdot').classList.add('live');
     document.getElementById('btext').innerText='Location LIVE';
-    watchId=navigator.geolocation.watchPosition(pos=>{
+
+    if('wakeLock' in navigator) {
+      navigator.wakeLock.request('screen').catch(()=>{});
+    }
+
+    watchId = navigator.geolocation.watchPosition(pos=>{
       const lat=pos.coords.latitude, lng=pos.coords.longitude;
       gpsCount++;
-      db.ref('liveLocation/'+selBus).set({lat,lng});
-      document.getElementById('gpsCount').innerText=gpsCount;
-      document.getElementById('gpsVal').innerText=lat.toFixed(5)+', '+lng.toFixed(5);
-    },err=>{
-      document.getElementById('gpsVal').innerText='GPS Error: '+err.message;
-    },{enableHighAccuracy:true,maximumAge:0});
+      db.ref('liveLocation/'+selBus).set({lat, lng, trip:selTrip, ts:Date.now()});
+      document.getElementById('gpsCount').innerText = gpsCount;
+      document.getElementById('gpsVal').innerText   = lat.toFixed(5)+', '+lng.toFixed(5);
+    }, err=>{
+      document.getElementById('gpsVal').innerText = 'GPS Error: '+err.message;
+    }, {enableHighAccuracy:true, maximumAge:0});
   }
 
-  function stopTracking(){
+  function stopTracking() {
     isTracking=false;
     if(watchId) navigator.geolocation.clearWatch(watchId);
     db.ref('liveLocation/'+selBus).remove();
