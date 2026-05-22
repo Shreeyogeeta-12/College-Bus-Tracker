@@ -1,181 +1,421 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>KLS GIT Bus Tracker</title>
-  <link rel="manifest" href="manifest.json">
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>KLS GIT Bus Tracker</title>
+<link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1a73e8">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Bus Tracker">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: Arial; }
-    #map { height: 100vh; width: 100%; }
-    #topbar {
-      position: absolute;
-      top: 10px; left: 50%;
-      transform: translateX(-50%);
-      background: white;
-      padding: 10px 16px;
-      border-radius: 16px;
-      z-index: 1000;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-      text-align: center;
-      min-width: 300px;
-    }
-    #busSelect {
-      width: 100%;
-      padding: 8px;
-      font-size: 0.9rem;
-      border-radius: 8px;
-      border: 1px solid #ccc;
-      margin-bottom: 6px;
-    }
-    #info { font-size: 0.85rem; font-weight: bold; color: #333; }
-    #driverInfo { font-size: 0.72rem; color: #666; margin-top: 4px; }
-    #eta { font-size: 0.8rem; color: #e74c3c; font-weight: bold; margin-top: 4px; }
-  </style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;font-family:'Outfit',sans-serif;overflow:hidden}
+#map{height:100vh;width:100%}
+
+#topbar{
+  position:absolute;top:14px;left:50%;
+  transform:translateX(-50%);
+  background:white;padding:12px 16px 10px;
+  border-radius:20px;z-index:1000;
+  box-shadow:0 4px 24px rgba(0,0,0,0.15);
+  min-width:320px;max-width:92vw;
+  border:1px solid rgba(0,0,0,0.07);
+}
+.topbar-brand{
+  display:flex;align-items:center;gap:8px;
+  margin-bottom:10px;padding-bottom:10px;
+  border-bottom:1px solid #f0f0f0;
+}
+.topbar-brand .logo{font-size:22px}
+.topbar-brand h1{font-size:14px;font-weight:800;color:#111;letter-spacing:-0.3px}
+.topbar-brand p{font-size:10px;color:#888;margin-top:1px}
+.live-pill{
+  margin-left:auto;display:flex;align-items:center;gap:5px;
+  background:#f0fdf4;border:1px solid #bbf7d0;
+  border-radius:100px;padding:3px 10px;
+  font-size:10px;font-weight:700;color:#16a34a;letter-spacing:0.5px;
+}
+.live-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:#16a34a;animation:blink 1.2s ease-in-out infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+#busSelect{
+  width:100%;padding:9px 30px 9px 12px;
+  font-size:13px;font-family:'Outfit',sans-serif;font-weight:500;
+  border-radius:10px;border:1.5px solid #e5e7eb;
+  background:#fafafa;color:#111;
+  margin-bottom:8px;outline:none;cursor:pointer;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;
+}
+#busSelect:focus{border-color:#4285F4}
+#info{font-size:13px;font-weight:600;color:#222}
+#driverInfo{font-size:11px;color:#777;margin-top:3px}
+
+#homeStopBanner{
+  margin-top:8px;background:#eff6ff;
+  border:1px solid #bfdbfe;border-radius:10px;
+  padding:8px 12px;font-size:12px;color:#1d4ed8;
+  display:none;align-items:center;justify-content:space-between;gap:8px;
+}
+#homeStopText{font-weight:600}
+#changeStopBtn{
+  background:none;border:1px solid #3b82f6;color:#3b82f6;
+  border-radius:6px;padding:3px 8px;font-size:11px;
+  cursor:pointer;white-space:nowrap;font-family:'Outfit',sans-serif;
+}
+
+#etaCard{
+  position:absolute;bottom:28px;right:14px;
+  z-index:1000;background:white;
+  border-radius:18px;padding:16px 20px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.15);
+  min-width:170px;display:none;
+  border:1px solid rgba(0,0,0,0.06);
+  animation:slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes slideUp{
+  from{opacity:0;transform:translateY(12px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.eta-label{font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:1.2px;font-weight:600;margin-bottom:4px}
+.eta-time{font-size:40px;font-weight:800;color:#16a34a;line-height:1;letter-spacing:-1px;display:inline}
+.eta-unit{font-size:14px;font-weight:700;color:#16a34a;margin-left:3px}
+.eta-stop{font-size:13px;color:#222;font-weight:600;margin-top:6px}
+.eta-dist{font-size:12px;color:#f97316;font-weight:600;margin-top:2px}
+.eta-divider{height:1px;background:#f0f0f0;margin:10px 0}
+.eta-home{font-size:11px;color:#3b82f6;font-weight:600;display:none}
+
+#setupModal{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,0.45);backdrop-filter:blur(4px);
+  z-index:2000;align-items:center;justify-content:center;
+}
+#setupModal.show{display:flex}
+#setupBox{
+  background:white;border-radius:24px;
+  padding:28px 24px;width:min(360px,92vw);
+  box-shadow:0 20px 60px rgba(0,0,0,0.25);
+  animation:popIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes popIn{
+  from{opacity:0;transform:scale(0.85)}
+  to{opacity:1;transform:scale(1)}
+}
+.setup-icon{font-size:40px;text-align:center;margin-bottom:12px}
+#setupBox h2{font-size:18px;font-weight:800;color:#111;margin-bottom:4px;text-align:center}
+#setupBox p{font-size:12px;color:#777;margin-bottom:20px;text-align:center;line-height:1.6}
+#setupBox label{font-size:11px;color:#555;font-weight:700;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px}
+#setupBox select{width:100%;padding:11px 14px;border-radius:12px;border:1.5px solid #e5e7eb;font-size:13px;margin-bottom:14px;background:#fafafa;font-family:'Outfit',sans-serif;outline:none}
+#setupBox select:focus{border-color:#4285F4}
+#saveProfileBtn{width:100%;padding:14px;background:linear-gradient(135deg,#4285F4,#1a73e8);color:white;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;box-shadow:0 4px 16px rgba(66,133,244,0.35);transition:transform 0.15s}
+#saveProfileBtn:hover{transform:translateY(-1px)}
+#skipBtn{width:100%;padding:10px;background:none;color:#aaa;border:none;font-size:12px;cursor:pointer;margin-top:6px;font-family:'Outfit',sans-serif}
+
+#simPanel{
+  position:absolute;bottom:28px;left:14px;
+  z-index:1000;background:white;
+  border-radius:16px;padding:12px 16px;
+  box-shadow:0 4px 20px rgba(0,0,0,0.12);
+  border:1px solid rgba(0,0,0,0.06);
+  max-width:180px;
+}
+.sim-title{font-weight:700;color:#222;font-size:12px;margin-bottom:8px}
+#simBtn{width:100%;padding:9px;background:#4285F4;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;transition:background 0.2s}
+#simBtn.stop{background:#ef4444}
+#simStatus{font-size:10px;color:#888;margin-top:6px;text-align:center}
+
+.leaflet-popup-content-wrapper{border-radius:14px!important;box-shadow:0 4px 20px rgba(0,0,0,0.15)!important;font-family:'Outfit',sans-serif!important}
+.leaflet-popup-content{margin:12px 16px!important;font-size:13px!important}
+</style>
 </head>
 <body>
 
+<!-- SETUP MODAL -->
+<div id="setupModal">
+  <div id="setupBox">
+    <div class="setup-icon">🚌</div>
+    <h2>Welcome to KLS GIT Bus Tracker</h2>
+    <p>Set your home stop once — app remembers it forever!</p>
+    <label>Your Stop / Bus</label>
+    <select id="setupBus">
+      <option value="">-- Choose your bus --</option>
+      <option value="bus1">Bus 1 — Mahantesh Nagar</option>
+      <option value="bus2">Bus 2 — Kakati / Hanuman Nagar</option>
+      <option value="bus3">Bus 3 — Hanuman Nagar</option>
+      <option value="bus4">Bus 4 — Vadagaon</option>
+      <option value="bus5">Bus 5 — Marihal / RC Nagar</option>
+      <option value="bus6">Bus 6 — Vadagaon (Alt)</option>
+      <option value="bus7">Bus 7 — Khanapur</option>
+      <option value="bus8">Bus 8 — CBT / RTO</option>
+      <option value="bus9">Bus 9 — Marihal</option>
+      <option value="bus10">Bus 10 — Khanapur (Alt)</option>
+      <option value="bus11">Bus 11 — RC Nagar</option>
+      <option value="bus12">Bus 12 — Shahu Nagar</option>
+      <option value="bus13">Bus 13 — Uchagoan</option>
+      <option value="bus14">Bus 14 — Shahapur</option>
+      <option value="bus15">Bus 15 — Kakati</option>
+      <option value="bus16">Bus 16 — Ramteerth Nagar</option>
+    </select>
+    <label>Your Home Stop</label>
+    <select id="setupStop">
+      <option value="">-- Select your stop --</option>
+      <option>Mahantesh Nagar</option><option>Ramteerth Nagar</option>
+      <option>Hanuman Nagar</option><option>RC Nagar</option>
+      <option>Vadagaon</option><option>Kakati</option>
+      <option>Shahapur</option><option>Bhagya Nagar</option>
+      <option>Shahu Nagar</option><option>Khanapur</option>
+      <option>Channamma Circle</option><option>RTO</option>
+      <option>Machhe</option><option>Marihal</option>
+      <option>Indal Colony</option><option>Azam Nagar</option>
+      <option>Fish Market</option><option>Sadashiv Nagar</option>
+      <option>TV Centre</option><option>Gandhi Nagar</option>
+      <option>Goa Ves</option><option>RPD Cross</option>
+      <option>KLE Engg College</option><option>Raghunath Peth</option>
+      <option>Guru Prasad Colony</option><option>Bogar Ves</option>
+      <option>Arun Theatre</option><option>CBT</option>
+      <option>Utsav</option><option>Fort Circle</option>
+      <option>BCM Hostel</option><option>Srinagar Garden</option>
+      <option>Ganesh Chouk</option><option>Tukaram Bank</option>
+      <option>Vinayak Nagar</option><option>Sulga</option>
+      <option>Nehru Nagar</option><option>Camp</option>
+      <option>Congress Road</option><option>Nath Pai Circle</option>
+      <option>Shindoli Cross</option><option>Mandoli Road</option>
+    </select>
+    <button id="saveProfileBtn" onclick="saveProfile()">✅ Save & Start Tracking</button>
+    <button id="skipBtn" onclick="skipSetup()">Skip for now</button>
+  </div>
+</div>
+
+<!-- TOP BAR -->
 <div id="topbar">
+  <div class="topbar-brand">
+    <span class="logo">🚌</span>
+    <div>
+      <h1>KLS GIT Bus Tracker</h1>
+      <p>Gogte Institute of Technology, Belagavi</p>
+    </div>
+    <div class="live-pill"><div class="live-dot"></div>LIVE</div>
+  </div>
   <select id="busSelect" onchange="selectBus()">
-  <option value="bus1">Mahantesh Nagar</option>
-<option value="bus2">Kakati / Hanuman Nagar</option>
-<option value="bus3">Hanuman Nagar</option>
-<option value="bus4">Vadagaon</option>
-<option value="bus5">Marihal / RC Nagar</option>
-<option value="bus6">Vadagaon (Alt)</option>
-<option value="bus7">Khanapur</option>
-<option value="bus8">CBT / RTO</option>
-<option value="bus9">Marihal</option>
-<option value="bus10">Khanapur (Alt)</option>
-<option value="bus11">RC Nagar</option>
-<option value="bus12">Shahu Nagar</option>
-<option value="bus13">Uchagoan</option>
-<option value="bus14">Shahapur</option>
-<option value="bus15">Kakati</option>
-<option value="bus16">Ramteerth Nagar</option>
-</select>
-  <div id="info">🚌 Select a bus to track</div>
+    <option value="">-- Choose your bus --</option>
+    <option value="bus1">Bus 1 — Mahantesh Nagar</option>
+    <option value="bus2">Bus 2 — Kakati / Hanuman Nagar</option>
+    <option value="bus3">Bus 3 — Hanuman Nagar</option>
+    <option value="bus4">Bus 4 — Vadagaon</option>
+    <option value="bus5">Bus 5 — Marihal / RC Nagar</option>
+    <option value="bus6">Bus 6 — Vadagaon (Alt)</option>
+    <option value="bus7">Bus 7 — Khanapur</option>
+    <option value="bus8">Bus 8 — CBT / RTO</option>
+    <option value="bus9">Bus 9 — Marihal</option>
+    <option value="bus10">Bus 10 — Khanapur (Alt)</option>
+    <option value="bus11">Bus 11 — RC Nagar</option>
+    <option value="bus12">Bus 12 — Shahu Nagar</option>
+    <option value="bus13">Bus 13 — Uchagoan</option>
+    <option value="bus14">Bus 14 — Shahapur</option>
+    <option value="bus15">Bus 15 — Kakati</option>
+    <option value="bus16">Bus 16 — Ramteerth Nagar</option>
+  </select>
+  <div id="info">🚌 Select a bus to begin tracking</div>
   <div id="driverInfo"></div>
-  <div id="eta"></div>
+  <div id="homeStopBanner">
+    <span id="homeStopText">🏠 Home stop</span>
+    <button id="changeStopBtn" onclick="showSetup()">Change</button>
+  </div>
 </div>
 
 <div id="map"></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- ETA CARD — only visible when bus is LIVE -->
+<div id="etaCard">
+  <div class="eta-label">⏱ Next Stop ETA</div>
+  <div><span class="eta-time" id="etaTime">—</span><span class="eta-unit">min</span></div>
+  <div class="eta-stop" id="etaStop"></div>
+  <div class="eta-dist" id="etaDist"></div>
+  <div class="eta-divider"></div>
+  <div class="eta-home" id="etaHome"></div>
+</div>
+
+<!-- DEMO SIM PANEL -->
+<div id="simPanel">
+  <div class="sim-title">🎮 Demo Controls</div>
+  <button id="simBtn" onclick="toggleSim()">▶ Start Bus Simulation</button>
+  <div id="simStatus">Select a bus first</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
 
 <script>
-  firebase.initializeApp({
-    databaseURL: "https://college-bus-tracker-11fce-default-rtdb.firebaseio.com"
-  });
-  const db = firebase.database();
+firebase.initializeApp({
+  databaseURL:"https://college-bus-tracker-11fce-default-rtdb.firebaseio.com"
+});
+const db = firebase.database();
 
-  const map = L.map('map', {
-    center: [15.8300, 74.5100],
-    zoom: 13,
-    minZoom: 12,
-    maxZoom: 17,
-    maxBounds: [[15.6200, 74.3800],[15.9600, 74.6500]],
-    maxBoundsViscosity: 0.5
-  });
+window.addEventListener('load', function(){
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-  maxZoom: 19,
-  attribution: '© OpenStreetMap © CARTO'
+// ── MAP — Belgaum taluk restricted ────────────────────
+const map = L.map('map',{
+  center:[15.8500,74.5100],zoom:13,
+  minZoom:12,maxZoom:19,
+  maxBounds:[[15.62,74.34],[15.97,74.67]],
+  maxBoundsViscosity:0.8
+});
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
+  attribution:'© OpenStreetMap © CARTO',
+  subdomains:'abcd',maxZoom:19
 }).addTo(map);
 
- const busData = {
-    bus1:  { name: "Mahantesh Nagar", driver: "Indrajeet Karvekar", phone: "9008625349", time: "7:30 AM" },
-    bus2:  { name: "Kakati / Hanuman Nagar", driver: "Sushil H. Patil", phone: "7795135936", time: "7:50 AM" },
-    bus3:  { name: "Hanuman Nagar", driver: "Ragavendra Deepak N", phone: "8073035140", time: "7:50 AM" },
-    bus4:  { name: "Vadagaon", driver: "Kannappa Baganal", phone: "9964810056", time: "7:50 AM" },
-    bus5:  { name: "Marihal / RC Nagar", driver: "S. M. Kalasekar", phone: "9164332711", time: "7:30 AM" },
-    bus6:  { name: "Vadagaon (Alt)", driver: "V. S. Kambar", phone: "9663763819", time: "7:50 AM" },
-    bus7:  { name: "Khanapur", driver: "New Staff", phone: "—", time: "7:40 AM" },
-    bus8:  { name: "CBT / RTO", driver: "Vinod Arjun Patil", phone: "7338667662", time: "7:50 AM" },
-    bus9:  { name: "Marihal", driver: "Ravi Dandagal", phone: "8197297335", time: "9:00 AM" },
-    bus10: { name: "Khanapur (Alt)", driver: "Bharama D", phone: "9985166439", time: "9:00 AM" },
-    bus11: { name: "RC Nagar", driver: "Manjunath Mailannavar", phone: "9972781413", time: "7:50 AM" },
-    bus12: { name: "Shahu Nagar", driver: "Praveen Shivaji Tupare", phone: "9902949685", time: "7:40 AM" },
-    bus13: { name: "Uchagoan", driver: "Bharat N. Dhangavde", phone: "9844614143", time: "7:30 AM" },
-    bus14: { name: "Shahapur", driver: "Sanjay Tarihalkar", phone: "9886867705", time: "7:50 AM" },
-    bus15: { name: "Kakati", driver: "C. I. Sangammanavar", phone: "9008808351", time: "7:40 AM" },
-    bus16: { name: "Ramteerth Nagar", driver: "Babu P. Chalvatkar", phone: "9686149872", time: "7:50 AM" }
-  };
+// ── BUS DATA ──────────────────────────────────────────
+const busData={
+  bus1: {name:"Bus 1 — Mahantesh Nagar",    driver:"Indrajeet Karvekar",    phone:"9008625349",time:"7:30 AM"},
+  bus2: {name:"Bus 2 — Kakati/Hanuman Nagar",driver:"Sushil H. Patil",      phone:"7795135936",time:"7:50 AM"},
+  bus3: {name:"Bus 3 — Hanuman Nagar",       driver:"Ragavendra Deepak N",  phone:"8073035140",time:"7:50 AM"},
+  bus4: {name:"Bus 4 — Vadagaon",            driver:"Kannappa Baganal",     phone:"9964810056",time:"7:50 AM"},
+  bus5: {name:"Bus 5 — Marihal/RC Nagar",    driver:"S. M. Kalasekar",      phone:"9164332711",time:"7:30 AM"},
+  bus6: {name:"Bus 6 — Vadagaon (Alt)",      driver:"V. S. Kambar",         phone:"9663763819",time:"7:50 AM"},
+  bus7: {name:"Bus 7 — Khanapur",            driver:"New Staff",            phone:"—",         time:"7:40 AM"},
+  bus8: {name:"Bus 8 — CBT/RTO",             driver:"Vinod Arjun Patil",    phone:"7338667662",time:"7:50 AM"},
+  bus9: {name:"Bus 9 — Marihal",             driver:"Ravi Dandagal",        phone:"8197297335",time:"9:00 AM"},
+  bus10:{name:"Bus 10 — Khanapur (Alt)",     driver:"Bharama D",            phone:"9985166439",time:"9:00 AM"},
+  bus11:{name:"Bus 11 — RC Nagar",           driver:"Manjunath Mailannavar",phone:"9972781413",time:"7:50 AM"},
+  bus12:{name:"Bus 12 — Shahu Nagar",        driver:"Praveen Shivaji Tupare",phone:"9902949685",time:"7:40 AM"},
+  bus13:{name:"Bus 13 — Uchagoan",           driver:"Bharat N. Dhangavde",  phone:"9844614143",time:"7:30 AM"},
+  bus14:{name:"Bus 14 — Shahapur",           driver:"Sanjay Tarihalkar",    phone:"9886867705",time:"7:50 AM"},
+  bus15:{name:"Bus 15 — Kakati",             driver:"C. I. Sangammanavar",  phone:"9008808351",time:"7:40 AM"},
+  bus16:{name:"Bus 16 — Ramteerth Nagar",    driver:"Babu P. Chalvatkar",   phone:"9686149872",time:"7:50 AM"}
+};
 
-  stops.forEach((stop, i) => {
-    const color = i === 0 ? 'red' : 'blue';
-    const html = `<div style="background:${color};width:10px;height:10px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.5)"></div>`;
-    const icon = L.divIcon({ className: '', html, iconSize: [10,10], iconAnchor: [5,5] });
-    L.marker([stop.lat, stop.lng], { icon }).addTo(map).bindPopup('<b>🚏 ' + stop.name + '</b>');
+// ── STOP COORDINATES ──────────────────────────────────
+const stopCoords={
+  "KLS GIT":           {lat:15.8155,lng:74.4868},
+  "Mahantesh Nagar":   {lat:15.8694,lng:74.5291},
+  "Ramteerth Nagar":   {lat:15.8907,lng:74.5433},
+  "Hanuman Nagar":     {lat:15.8765,lng:74.4862},
+  "RC Nagar":          {lat:15.8276,lng:74.4899},
+  "Vadagaon":          {lat:15.8365,lng:74.5234},
+  "Kakati":            {lat:15.9318,lng:74.5270},
+  "Shahapur":          {lat:15.8461,lng:74.5167},
+  "Bhagya Nagar":      {lat:15.8288,lng:74.5066},
+  "Shahu Nagar":       {lat:15.8927,lng:74.5126},
+  "Khanapur":          {lat:15.6452,lng:74.5214},
+  "Channamma Circle":  {lat:15.8673,lng:74.5116},
+  "RTO":               {lat:15.8964,lng:74.5425},
+  "Machhe":            {lat:15.7875,lng:74.4727},
+  "Marihal":           {lat:15.8801,lng:74.5607},
+  "Indal Colony":      {lat:15.9029,lng:74.5250},
+  "Azam Nagar":        {lat:15.8849,lng:74.5133},
+  "Fish Market":       {lat:15.8608,lng:74.5181},
+  "Sadashiv Nagar":    {lat:15.8797,lng:74.5081},
+  "TV Centre":         {lat:15.8800,lng:74.4985},
+  "Gandhi Nagar":      {lat:15.8629,lng:74.5338},
+  "Goa Ves":           {lat:15.8407,lng:74.5101},
+  "RPD Cross":         {lat:15.8345,lng:74.5048},
+  "KLE Engg College":  {lat:15.8202,lng:74.4985},
+  "Raghunath Peth":    {lat:15.8196,lng:74.5037},
+  "Guru Prasad Colony":{lat:15.8318,lng:74.4827},
+  "Bogar Ves":         {lat:15.8460,lng:74.4940},
+  "Arun Theatre":      {lat:15.8500,lng:74.5030},
+  "CBT":               {lat:15.8560,lng:74.5060},
+  "Utsav":             {lat:15.8460,lng:74.4960},
+  "Fort Circle":       {lat:15.8530,lng:74.5050},
+  "BCM Hostel":        {lat:15.8440,lng:74.4900},
+  "Srinagar Garden":   {lat:15.8600,lng:74.5100},
+  "Ganesh Chouk":      {lat:15.8630,lng:74.5070},
+  "Tukaram Bank":      {lat:15.8490,lng:74.5010},
+  "Vinayak Nagar":     {lat:15.8500,lng:74.5030},
+  "Sulga":             {lat:15.8800,lng:74.5200},
+  "Nehru Nagar":       {lat:15.8510,lng:74.5030},
+  "Camp":              {lat:15.8490,lng:74.5010},
+  "Congress Road":     {lat:15.8490,lng:74.5010},
+  "Nath Pai Circle":   {lat:15.8480,lng:74.4950},
+  "Shindoli Cross":    {lat:15.8720,lng:74.5200},
+  "Mandoli Road":      {lat:15.8400,lng:74.5000}
+};
+
+// ── BUS ROUTES ────────────────────────────────────────
+const busRoutes={
+  bus1: ["Mahantesh Nagar","RTO","CBT","Arun Theatre","Fish Market","Bogar Ves","KLS GIT"],
+  bus2: ["Kakati","Channamma Circle","CBT","Fish Market","Bogar Ves","KLS GIT"],
+  bus3: ["Hanuman Nagar","TV Centre","Sadashiv Nagar","Congress Road","Bogar Ves","KLS GIT"],
+  bus4: ["Vadagaon","Nath Pai Circle","Goa Ves","RPD Cross","KLS GIT"],
+  bus5: ["RC Nagar","Gandhi Nagar","Fort Circle","KLS GIT"],
+  bus6: ["Vadagaon","Channamma Circle","CBT","KLS GIT"],
+  bus7: ["Khanapur","BCM Hostel","Machhe","KLS GIT"],
+  bus8: ["Bogar Ves","CBT","RTO","Channamma Circle","Fish Market","Goa Ves","KLS GIT"],
+  bus9: ["Marihal","Gandhi Nagar","Fort Circle","KLS GIT"],
+  bus10:["Khanapur","BCM Hostel","Machhe","KLS GIT"],
+  bus11:["RC Nagar","Mandoli Road","Guru Prasad Colony","KLS GIT"],
+  bus12:["Shahu Nagar","Nehru Nagar","Camp","Congress Road","KLS GIT"],
+  bus13:["Sulga","Vinayak Nagar","Fish Market","Arun Theatre","KLS GIT"],
+  bus14:["Shahapur","Tukaram Bank","Goa Ves","RPD Cross","Utsav","KLS GIT"],
+  bus15:["Kakati","Indal Colony","Azam Nagar","Channamma Circle","Bogar Ves","KLS GIT"],
+  bus16:["Ramteerth Nagar","Ganesh Chouk","Srinagar Garden","Channamma Circle","Bogar Ves","KLS GIT"]
+};
+
+// ── STOP MARKERS ─────────────────────────────────────
+Object.entries(stopCoords).forEach(([name,coord])=>{
+  const isCollege=name==="KLS GIT";
+  const color=isCollege?'#ef4444':'#4285F4';
+  const size=isCollege?16:11;
+  const glow=isCollege?'rgba(239,68,68,0.35)':'rgba(66,133,244,0.3)';
+  const html=`<div style="background:${color};width:${size}px;height:${size}px;border-radius:50%;border:2.5px solid white;box-shadow:0 0 0 3px ${glow},0 2px 8px rgba(0,0,0,0.4)"></div>`;
+  L.marker([coord.lat,coord.lng],{
+    icon:L.divIcon({className:'',html,iconSize:[size,size],iconAnchor:[size/2,size/2]})
+  }).addTo(map).bindPopup(`<b>${isCollege?'🏫 ':'🚏 '}${name}</b>`);
+});
+
+// ── HELPERS ───────────────────────────────────────────
+function getDistance(lat1,lng1,lat2,lng2){
+  const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLng=(lng2-lng1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+function getNearestStop(busKey,busLat,busLng){
+  const route=busRoutes[busKey];if(!route)return null;
+  let nearest=null,minDist=Infinity;
+  route.forEach(s=>{
+    const c=stopCoords[s];if(!c)return;
+    const d=getDistance(busLat,busLng,c.lat,c.lng);
+    if(d<minDist){minDist=d;nearest={name:s,dist:d};}
   });
+  return nearest;
+}
 
-  function getDistance(lat1, lng1, lat2, lng2) {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLng = (lng2 - lng1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
-              Math.sin(dLng/2) * Math.sin(dLng/2);
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+function animateMarker(marker,fromLat,fromLng,toLat,toLng,ms){
+  const t0=performance.now();
+  function step(now){
+    const p=Math.min((now-t0)/ms,1);
+    const e=p<0.5?2*p*p:-1+(4-2*p)*p;
+    marker.setLatLng([fromLat+(toLat-fromLat)*e,fromLng+(toLng-fromLng)*e]);
+    if(p<1)requestAnimationFrame(step);
   }
+  requestAnimationFrame(step);
+}
 
-  function calculateETA(busLat, busLng) {
-    const dist = getDistance(busLat, busLng, 15.8155, 74.4868);
-    const mins = Math.round((dist / 30) * 60);
-    if (mins <= 1) return '🏫 Arrived at College!';
-    if (mins > 120) return '⏱️ More than 2 hrs away';
-    return '⏱️ ETA to College: ' + mins + ' mins';
-  }
+// ── PROFILE ───────────────────────────────────────────
+let myBus=localStorage.getItem('git_myBus')||'';
+let myStop=localStorage.getItem('git_myStop')||'';
 
-  let busMarker = null;
-  let currentListener = null;
-
-  function selectBus() {
-    const selectedBus = document.getElementById('busSelect').value;
-    if (!selectedBus) return;
-    const bus = busData[selectedBus];
-    document.getElementById('info').innerText = '🔍 Looking for ' + bus.name + '...';
-    document.getElementById('driverInfo').innerText = '👤 ' + bus.driver + '  📞 ' + bus.phone + '  ⏰ ' + bus.time;
-    document.getElementById('eta').innerText = '';
-    if (busMarker) { map.removeLayer(busMarker); busMarker = null; }
-    if (currentListener) currentListener.off();
-    currentListener = db.ref('liveLocation/' + selectedBus);
-    currentListener.on('value', (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const { lat, lng } = data;
-        document.getElementById('info').innerText = '🟢 ' + bus.name + ' is LIVE!';
-        document.getElementById('eta').innerText = calculateETA(lat, lng);
-        const busIcon = L.divIcon({
-          className: '',
-          html: '<div style="font-size:2rem;filter:drop-shadow(2px 2px 2px rgba(0,0,0,0.5))">🚌</div>',
-          iconSize: [40, 40],
-          iconAnchor: [20, 20]
-        });
-        if (!busMarker) {
-          busMarker = L.marker([lat, lng], {icon: busIcon}).addTo(map).bindPopup(bus.name).openPopup();
-        } else {
-          busMarker.setLatLng([lat, lng]);
-        }
-        map.setView([lat, lng], 15);
-      } else {
-        document.getElementById('info').innerText = '🔴 ' + bus.name + ' not live yet';
-        document.getElementById('eta').innerText = '';
-      }
-    });
-  }
-</script>
-  <script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js')
-      .then(() => console.log('SW registered'))
-      .catch(() => console.log('SW failed'));
-  }
-</script>
-</body>
-</html>
+window.saveProfile=function(){
+  const bus=document.getElementById('setupBus').value;
+  const stop=document.getElementById('setupStop').value;
+  if(!bus||!stop){alert('Please select both!');return;}
+  localStorage.setItem('git_myBus',bus);
+  localStorage.setItem('git_myStop',stop);
+  myBus=bus;myStop=stop;
+  document.getElementById('setupModal').classList.remove('show');
+  applyProfile();selectBus();
+};
+window.skipSetup=function(){document.getElementById('setupModal').classList.remove('show');};
+window.showSetup=function(){
+  document.getElementById('setupBus').value=myBus;
+  document.getElementById('setupStop')
