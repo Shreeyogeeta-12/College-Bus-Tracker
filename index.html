@@ -558,6 +558,31 @@ window.selectBus = function(){
 
   document.getElementById('simStatus').innerHTML =
     "Ready to simulate";
+    db.ref('liveLocation/' + busKey).on('value', snap => {
+    const data = snap.val();
+    if(!data){
+      document.getElementById('info').innerHTML = "🔴 Bus not live yet";
+      document.getElementById('etaCard').style.display = 'none';
+      return;
+    }
+    const latlng = [data.lat, data.lng];
+    if(!busMarker){
+      busMarker = L.marker(latlng,{
+        icon:L.divIcon({
+          html:`<div style="font-size:28px">🚌</div>`,
+          className:'',
+          iconSize:[30,30]
+        })
+      }).addTo(map);
+    } else {
+      busMarker.setLatLng(latlng);
+    }
+    map.setView(latlng, 15);
+    document.getElementById('info').innerHTML = "🟢 " + busData[busKey].name + " is LIVE";
+    document.getElementById('etaCard').style.display = 'block';
+    document.getElementById('etaTime').innerHTML = "~";
+    document.getElementById('etaStop').innerHTML = "Bus is on the way";
+  });
 };
 
 // ================= SIMULATION =================
