@@ -348,7 +348,22 @@
     watchId = navigator.geolocation.watchPosition(pos=>{
       const lat=pos.coords.latitude, lng=pos.coords.longitude;
       gpsCount++;
-      db.ref('liveLocation/'+selBus).set({lat, lng, trip:selTrip, ts:Date.now()});
+      db.ref('liveLocation/'+selBus).set({
+
+  lat:lat,
+  lng:lng,
+
+  heading:pos.coords.heading || 0,
+
+  speed:pos.coords.speed || 0,
+
+  accuracy:pos.coords.accuracy,
+
+  trip:selTrip,
+
+  updatedAt:Date.now()
+
+});
       document.getElementById('gpsCount').innerText = gpsCount;
       document.getElementById('gpsVal').innerText   = lat.toFixed(5)+', '+lng.toFixed(5);
     }, err=>{
