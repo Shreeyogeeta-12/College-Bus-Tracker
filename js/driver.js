@@ -54,8 +54,8 @@ function onBusChange() {
   document.getElementById('nextStop').innerText = stops[stops.length - 1] || '—';
 
   // Build route progress list
-  document.getElementById('routeList').innerHTML = stops.map((name, i) => `
-    <div class="rstop">
+document.getElementById('routeList').innerHTML = stops.map((name, i) => `
+    <div class="rstop" id="stop-${i}">
       <div class="sdot ${i === 0 ? 'cur' : ''}"></div>
       <div class="sname">${name}</div>
       <div class="sstatus ${i === 0 ? 'here' : ''}">${i === 0 ? '● Here' : 'Upcoming'}</div>
@@ -90,6 +90,15 @@ function startTracking() {
     pos => {
       const { latitude: lat, longitude: lng, heading, speed, accuracy } = pos.coords;
       gpsCount++;
+      const stops = ROUTE_STOPS[selBus] || [];
+      let currentStopIndex = 0;
+      stops.forEach((stopName, i) => {
+        const coord = STOP_COORDS[stopName];
+        if (!coord) return;
+        const dist = getDistance(lat, lng, coord.lat, coord.lng);
+        if (dist < 0.3) currentStopIndex = i + 1;
+     });
+     updateStopProgress(currentStopIndex);
 
       db.ref('liveLocation/' + selBus).set({
         lat,
@@ -127,4 +136,26 @@ function stopTracking() {
   document.getElementById('gpsVal').innerText  = 'Not sharing';
   gpsCount = 0;
   document.getElementById('gpsCount').innerText = '0';
+}
+function updateStopProgress(currentIndex) {
+  const stops = ROUTE_STOPS[selBus] || [];
+  stops.forEach((name, i) => {
+    const dot = document.querySelector(`#stop-${i} .sdot`);
+    const status = document.querySelector(`#stop-${i} .sstatus`);
+    if (!dot || !status) return;
+
+    if (i < currentIndex) {
+      dot.style.background = '#f59e0b';
+      status.innerText = '✓ Passed';
+      status.style.color = '#f59e0b';
+    } else if (i === currentIndex) {
+      dot.style.background = '#1a73e8';
+      status.innerText = '● Here';
+      status.style.color = '#1a73e8';
+    } else {
+      dot.style.background = '#ccc';
+      status.innerText = 'Upcoming';
+      status.style.color = '#888';
+    }
+  });
 }
