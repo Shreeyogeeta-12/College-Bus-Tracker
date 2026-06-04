@@ -84,7 +84,25 @@ function startTracking() {
   document.getElementById('btext').innerText  = 'Location LIVE';
 
   // Keep screen awake while sharing
-  if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(() => {});
+  // Keep screen awake while sharing
+let wakeLock = null;
+async function requestWakeLock() {
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => {
+      requestWakeLock();
+    });
+  } catch (err) {
+    console.log('Wake lock failed:', err);
+  }
+}
+requestWakeLock();
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    requestWakeLock();
+  }
+});
 
   watchId = navigator.geolocation.watchPosition(
     pos => {

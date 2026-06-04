@@ -146,8 +146,12 @@ async function processRoadETA(driverLat, driverLng) {
     // ── 4. ETA = Ola duration scaled by actual vs expected speed ─
     let etaSeconds;
     if (speedHistory.length > 0) {
-      const avgSpeedMs = speedHistory.reduce((a, b) => a + b, 0) / speedHistory.length;
-      const validSpeed = avgSpeedMs > 1.5 ? avgSpeedMs : CITY_DEFAULT_SPEED_MS;
+      const sorted = [...speedHistory].sort((a, b) => a - b);
+const trimmed = sorted.slice(1, -1);
+const avgSpeedMs = trimmed.length > 0
+  ? trimmed.reduce((a, b) => a + b, 0) / trimmed.length
+  : CITY_DEFAULT_SPEED_MS;
+const validSpeed = avgSpeedMs > 1.5 ? avgSpeedMs : CITY_DEFAULT_SPEED_MS;
       const olaSpeedMs = roadDistanceMeters / olaDuration;
       const ratio      = olaSpeedMs / validSpeed;
       etaSeconds       = olaDuration * ratio * ETA_TRAFFIC_BUFFER;
