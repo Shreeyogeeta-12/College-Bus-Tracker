@@ -221,7 +221,14 @@ window.selectBus = function () {
   // Subscribe to live location
   dbListenerRef = db.ref('liveLocation/' + busKey).on('value', snap => {
     const data = snap.val();
-
+    // Auto clear stale data older than 3 hours
+if (data && data.updatedAt) {
+  const ageHours = (Date.now() - data.updatedAt) / (1000 * 60 * 60);
+  if (ageHours > SHIFT_END_CLEANUP_HOURS) {
+    db.ref('liveLocation/' + busKey).remove();
+    return;
+  }
+}
     if (!data || !data.lat || !data.lng) {
       document.getElementById('info').innerText = '🔴 Bus is currently OFFLINE';
       document.getElementById('etaCard').style.display = 'none';

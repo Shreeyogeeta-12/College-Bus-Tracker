@@ -19,7 +19,7 @@ const BELAGAVI_BOUNDS = [[15.7800, 74.4000], [15.9000, 74.6000]];
 
 // ── Ola Maps API ─────────────────────────────────────────────
 const OLA_MAPS_API_KEY = 's0OZq9XTSK6I8m2YxidijWQDa4JmxdgMCQvXglZo';
-
+const SHIFT_END_CLEANUP_HOURS = 1;
 // ── ETA engine config ─────────────────────────────────────────
 const SPEED_BUFFER_SIZE     = 10;           // how many GPS speed readings to average
 const CITY_DEFAULT_SPEED_MS = 25 / 3.6;   // fallback when bus is stopped at signal (~6.94 m/s = 25 km/h)

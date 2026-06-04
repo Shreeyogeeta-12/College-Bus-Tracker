@@ -103,7 +103,7 @@ document.addEventListener('visibilitychange', () => {
     requestWakeLock();
   }
 });
-
+  db.ref('liveLocation/' + selBus).onDisconnect().remove();
   watchId = navigator.geolocation.watchPosition(
     pos => {
       const { latitude: lat, longitude: lng, heading, speed, accuracy } = pos.coords;
