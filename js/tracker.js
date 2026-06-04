@@ -147,7 +147,7 @@ async function processRoadETA(driverLat, driverLng) {
     let etaSeconds;
     if (speedHistory.length > 0) {
       const avgSpeedMs = speedHistory.reduce((a, b) => a + b, 0) / speedHistory.length;
-      const validSpeed = avgSpeedMs > 0.5 ? avgSpeedMs : CITY_DEFAULT_SPEED_MS;
+      const validSpeed = avgSpeedMs > 1.5 ? avgSpeedMs : CITY_DEFAULT_SPEED_MS;
       const olaSpeedMs = roadDistanceMeters / olaDuration;
       const ratio      = olaSpeedMs / validSpeed;
       etaSeconds       = olaDuration * ratio * ETA_TRAFFIC_BUFFER;
@@ -157,7 +157,7 @@ async function processRoadETA(driverLat, driverLng) {
     const etaMinutes = Math.max(1, Math.round(etaSeconds / 60));
 
     // ── 5. Detect stopped bus ────────────────────────────────────
-    const isStopped = speedHistory.length >= 3 && speedHistory.every(s => s < 0.5);
+    const isStopped = speedHistory.length >= 3 && speedHistory.every(s => s < 1.5);
 
     // ── 6. Update ETA card UI ────────────────────────────────────
     document.getElementById('etaTime').innerText        = isStopped ? '~' + etaMinutes : etaMinutes;
