@@ -15,7 +15,7 @@ const CAMPUS_LOCATION = { lat: 15.8164, lng: 74.4835 };
 
 // Map viewport restricted to Belagavi district
 // Format: [[southWest lat, lng], [northEast lat, lng]]
-const BELAGAVI_BOUNDS = [[15.4800, 74.1500], [16.2200, 74.8800]];
+const BELAGAVI_BOUNDS = [[15.7800, 74.4000], [15.9000, 74.6000]];
 
 // ── Ola Maps API ─────────────────────────────────────────────
 const OLA_MAPS_API_KEY = 's0OZq9XTSK6I8m2YxidijWQDa4JmxdgMCQvXglZo';
