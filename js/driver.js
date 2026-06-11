@@ -107,6 +107,12 @@ document.addEventListener('visibilitychange', () => {
   watchId = navigator.geolocation.watchPosition(
     pos => {
       const { latitude: lat, longitude: lng, heading, speed, accuracy } = pos.coords;
+      
+      if (accuracy > 500) {
+         document.getElementById('gpsVal').innerText = 'Low Accuracy GPS: ' + accuracy.toFixed(1) + 'm';
+         return;
+      }
+
       gpsCount++;
       const stops = ROUTE_STOPS[selBus] || [];
       let currentStopIndex = 0;
