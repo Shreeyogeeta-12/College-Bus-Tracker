@@ -172,15 +172,7 @@ const validSpeed = avgSpeedMs > 1.5 ? avgSpeedMs : CITY_DEFAULT_SPEED_MS;
       : `${roadDistanceKm} km away`;
 
     // ── 7. Draw road path from Ola Maps encoded polyline ────────
-    if (window.activeLivePathSnippet) map.removeLayer(window.activeLivePathSnippet);
-    // Ola Maps returns overview_polyline as a plain string, not { points: "..." }
-    const encodedPoly = typeof json.routes[0].overview_polyline === 'string'
-      ? json.routes[0].overview_polyline
-      : json.routes[0].overview_polyline.points;
-    const routeCoords = decodePolyline(encodedPoly);
-    window.activeLivePathSnippet = L.polyline(routeCoords, {
-      color: '#1a73e8', weight: 5, opacity: 0.85,
-    }).addTo(map);
+    
 
   } catch (err) {
     console.error('ETA error:', err);
@@ -216,8 +208,6 @@ window.selectBus = function () {
     window.activeLivePathSnippet = null;
   }
   busMarker = null;
-
-  liveHistoryPath = L.polyline([], { color: '#1a73e8', weight: 3, opacity: 0.7 }).addTo(map);
 
   // Subscribe to live location
   dbListenerRef = db.ref('liveLocation/' + busKey).on('value', snap => {
