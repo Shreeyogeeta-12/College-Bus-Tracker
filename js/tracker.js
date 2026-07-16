@@ -231,7 +231,9 @@ window.selectBus = function () {
       busMarker.setLatLng(latlng);
     }
 
-    map.setView(latlng, 13);
+    if (!busMarker || locationPoints.length === 1) {
+  map.setView(latlng, 15);
+}
     document.getElementById('info').innerText          = '🟢 Link Connection Active';
     document.getElementById('etaCard').style.display   = 'block';
 
