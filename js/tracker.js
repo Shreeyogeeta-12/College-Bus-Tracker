@@ -11,7 +11,7 @@
    ============================================================ */
 
 // ── State ────────────────────────────────────────────────────
-let map, busMarker, liveHistoryPath, dbListenerRef;
+let map, busMarker, dbListenerRef;
 let currentBusKey  = null;
 let locationPoints = [];
 let speedHistory   = [];   // rolling GPS speed buffer (m/s)
@@ -230,7 +230,7 @@ if (data && data.updatedAt) {
 
     const latlng = [data.lat, data.lng];
     locationPoints.push(latlng);
-    liveHistoryPath.setLatLngs(locationPoints);
+  
 
     // Collect GPS speed for smoothed ETA
     const rawSpeed = (typeof data.speed === 'number' && data.speed > 1.5) ? data.speed : null;
