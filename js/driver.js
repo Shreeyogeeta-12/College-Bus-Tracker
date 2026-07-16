@@ -84,7 +84,7 @@ function startTracking() {
   document.getElementById('btext').innerText  = 'Location LIVE';
 
   // Keep screen awake while sharing
-  // Keep screen awake while sharing
+ 
 let wakeLock = null;
 async function requestWakeLock() {
   try {

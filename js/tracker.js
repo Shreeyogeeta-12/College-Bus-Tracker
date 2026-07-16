@@ -131,6 +131,7 @@ async function processRoadETA(driverLat, driverLng) {
     );
     const json = await response.json();
     if (!json.routes || !json.routes.length) return;
+    if (json.status !== 'SUCCESS') return;
 
     // Ola Maps legs array can be sparse — find first non-null leg
     const leg = json.routes[0].legs.find(l => l != null);
@@ -242,7 +243,7 @@ if (data && data.updatedAt) {
     liveHistoryPath.setLatLngs(locationPoints);
 
     // Collect GPS speed for smoothed ETA
-    const rawSpeed = (typeof data.speed === 'number' && data.speed > 0.5) ? data.speed : null;
+    const rawSpeed = (typeof data.speed === 'number' && data.speed > 1.5) ? data.speed : null;
     if (rawSpeed !== null) {
       speedHistory.push(rawSpeed);
       if (speedHistory.length > SPEED_BUFFER_SIZE) speedHistory.shift();
