@@ -108,7 +108,7 @@ document.addEventListener('visibilitychange', () => {
     pos => {
       const { latitude: lat, longitude: lng, heading, speed, accuracy } = pos.coords;
       
-      if (accuracy > 500) {
+      if (accuracy > 3000) {
          document.getElementById('gpsVal').innerText = 'Low Accuracy GPS: ' + accuracy.toFixed(1) + 'm';
          return;
       }
