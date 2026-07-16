@@ -14,8 +14,8 @@
 let map, busMarker, dbListenerRef;
 let currentBusKey  = null;
 let locationPoints = [];
-let speedHistory   = [];   // rolling GPS speed buffer (m/s)
-let routeStopIndex = 0;    // sequential pointer — which stop we're heading to next (never goes backward)
+let speedHistory   = [];
+let routeStopIndex = 0;
 
 // ── Map setup ────────────────────────────────────────────────
 const belagaviBounds = L.latLngBounds(
@@ -69,7 +69,6 @@ window.onShiftChange = function () {
 
 // ── Draw route stops on map ──────────────────────────────────
 function plotRouteStops(busKey) {
-  // Auto-collapse the panel so the map is visible
   setTimeout(() => {
     document.getElementById('topbar').classList.add('collapsed');
     document.getElementById('togglePanelBtn').innerHTML = '▼';
@@ -80,7 +79,7 @@ function plotRouteStops(busKey) {
   const stopsList = ROUTE_STOPS[busKey] || [];
   stopsList.forEach(stopName => {
     const coords = STOP_COORDS[stopName];
-    if (!coords) return; // skip if coordinates not defined
+    if (!coords) return;
 
     L.circleMarker([coords.lat, coords.lng], {
       radius: 6, color: '#ffffff', weight: 1.8, fillColor: '#1a73e8', fillOpacity: 1,
@@ -96,31 +95,26 @@ function plotRouteStops(busKey) {
   });
 }
 
-// ── ETA calculation (sequential stop tracking + real GPS speed) ─
+// ── ETA calculation ─────────────────────────────────────────
 async function processRoadETA(driverLat, driverLng) {
   try {
     const activeStops = ROUTE_STOPS[currentBusKey] || [];
     if (activeStops.length === 0) return;
 
-    // ── 1. Advance stop index if bus has passed current target ──
-    // Uses a while loop so it can skip multiple stops in one update
-    // (e.g. if the bus jumped ahead due to a GPS gap)
     while (routeStopIndex < activeStops.length - 1) {
       const targetName   = activeStops[routeStopIndex];
       const targetCoord  = STOP_COORDS[targetName] || CAMPUS_LOCATION;
       const distToTarget = getDistance(driverLat, driverLng, targetCoord.lat, targetCoord.lng);
       if (distToTarget < 0.3) {
-        routeStopIndex++;   // bus has passed this stop — move forward
+        routeStopIndex++;
       } else {
-        break;              // this is our actual next target
+        break;
       }
     }
 
-    // ── 2. Destination = current stop in sequential order ───────
     const destName  = activeStops[routeStopIndex];
     const destCoord = STOP_COORDS[destName] || CAMPUS_LOCATION;
 
-    // ── 3. Road distance + duration from Ola Maps (India traffic-aware) ─
     const response = await fetch(
       `https://api.olamaps.io/routing/v1/directions` +
       `?origin=${driverLat},${driverLng}` +
@@ -133,26 +127,23 @@ async function processRoadETA(driverLat, driverLng) {
     if (!json.routes || !json.routes.length) return;
     if (json.status !== 'SUCCESS') return;
 
-    // Ola Maps legs array can be sparse — find first non-null leg
     const leg = json.routes[0].legs.find(l => l != null);
     if (!leg) return;
 
-    // Ola Maps returns distance/duration in multiple possible formats — handle all
     const roadDistanceMeters = leg.distance?.value ?? leg.distance_meters ?? (typeof leg.distance === 'number' ? leg.distance : 0);
     const olaDuration        = leg.duration?.value ?? leg.duration_seconds ?? (typeof leg.duration === 'number' ? leg.duration : 0);
     if (!roadDistanceMeters || !olaDuration) return;
 
     const roadDistanceKm = (roadDistanceMeters / 1000).toFixed(1);
 
-    // ── 4. ETA = Ola duration scaled by actual vs expected speed ─
     let etaSeconds;
     if (speedHistory.length > 0) {
-      const sorted = [...speedHistory].sort((a, b) => a - b);
-const trimmed = sorted.slice(1, -1);
-const avgSpeedMs = trimmed.length > 0
-  ? trimmed.reduce((a, b) => a + b, 0) / trimmed.length
-  : CITY_DEFAULT_SPEED_MS;
-const validSpeed = avgSpeedMs > 1.5 ? avgSpeedMs : CITY_DEFAULT_SPEED_MS;
+      const sorted     = [...speedHistory].sort((a, b) => a - b);
+      const trimmed    = sorted.slice(1, -1);
+      const avgSpeedMs = trimmed.length > 0
+        ? trimmed.reduce((a, b) => a + b, 0) / trimmed.length
+        : CITY_DEFAULT_SPEED_MS;
+      const validSpeed = avgSpeedMs > 1.5 ? avgSpeedMs : CITY_DEFAULT_SPEED_MS;
       const olaSpeedMs = roadDistanceMeters / olaDuration;
       const ratio      = olaSpeedMs / validSpeed;
       etaSeconds       = olaDuration * ratio * ETA_TRAFFIC_BUFFER;
@@ -161,18 +152,13 @@ const validSpeed = avgSpeedMs > 1.5 ? avgSpeedMs : CITY_DEFAULT_SPEED_MS;
     }
     const etaMinutes = Math.max(1, Math.round(etaSeconds / 60));
 
-    // ── 5. Detect stopped bus ────────────────────────────────────
     const isStopped = speedHistory.length >= 3 && speedHistory.every(s => s < 1.5);
 
-    // ── 6. Update ETA card UI ────────────────────────────────────
     document.getElementById('etaTime').innerText        = isStopped ? '~' + etaMinutes : etaMinutes;
     document.getElementById('etaDestination').innerText = `Next Stop: ${destName}`;
     document.getElementById('etaDist').innerText        = isStopped
       ? `${roadDistanceKm} km — Bus may be stopped`
       : `${roadDistanceKm} km away`;
-
-    // ── 7. Draw road path from Ola Maps encoded polyline ────────
-    
 
   } catch (err) {
     console.error('ETA error:', err);
@@ -184,12 +170,10 @@ window.selectBus = function () {
   const busKey = document.getElementById('busSelect').value;
   if (!busKey) return;
 
-  // Remove old Firebase listener
   if (currentBusKey && dbListenerRef) {
     db.ref('liveLocation/' + currentBusKey).off('value', dbListenerRef);
   }
 
-  // Reset state
   currentBusKey  = busKey;
   locationPoints = [];
   speedHistory   = [];
@@ -200,46 +184,40 @@ window.selectBus = function () {
 
   plotRouteStops(busKey);
 
-  // Clear old map layers
-  if (busMarker)              map.removeLayer(busMarker);
-  if (liveHistoryPath)        map.removeLayer(liveHistoryPath);
+  if (busMarker) map.removeLayer(busMarker);
   if (window.activeLivePathSnippet) {
     map.removeLayer(window.activeLivePathSnippet);
     window.activeLivePathSnippet = null;
   }
   busMarker = null;
 
-  // Subscribe to live location
   dbListenerRef = db.ref('liveLocation/' + busKey).on('value', snap => {
     const data = snap.val();
-    // Auto clear stale data older than 3 hours
-if (data && data.updatedAt) {
-  const ageHours = (Date.now() - data.updatedAt) / (1000 * 60 * 60);
-  if (ageHours > SHIFT_END_CLEANUP_HOURS) {
-    db.ref('liveLocation/' + busKey).remove();
-    return;
-  }
-}
+
+    if (data && data.updatedAt) {
+      const ageHours = (Date.now() - data.updatedAt) / (1000 * 60 * 60);
+      if (ageHours > SHIFT_END_CLEANUP_HOURS) {
+        db.ref('liveLocation/' + busKey).remove();
+        return;
+      }
+    }
+
     if (!data || !data.lat || !data.lng) {
-      document.getElementById('info').innerText = '🔴 Bus is currently OFFLINE';
-      document.getElementById('etaCard').style.display = 'none';
+      document.getElementById('info').innerText          = '🔴 Bus is currently OFFLINE';
+      document.getElementById('etaCard').style.display   = 'none';
       if (busMarker) map.removeLayer(busMarker);
       busMarker = null;
       return;
     }
 
     const latlng = [data.lat, data.lng];
-    locationPoints.push(latlng);
-  
 
-    // Collect GPS speed for smoothed ETA
     const rawSpeed = (typeof data.speed === 'number' && data.speed > 1.5) ? data.speed : null;
     if (rawSpeed !== null) {
       speedHistory.push(rawSpeed);
       if (speedHistory.length > SPEED_BUFFER_SIZE) speedHistory.shift();
     }
 
-    // Move or create bus marker
     if (!busMarker) {
       busMarker = L.marker(latlng, {
         icon: L.divIcon({
@@ -254,8 +232,8 @@ if (data && data.updatedAt) {
     }
 
     map.setView(latlng, 13);
-    document.getElementById('info').innerText        = '🟢 Link Connection Active';
-    document.getElementById('etaCard').style.display = 'block';
+    document.getElementById('info').innerText          = '🟢 Link Connection Active';
+    document.getElementById('etaCard').style.display   = 'block';
 
     processRoadETA(data.lat, data.lng);
   });
