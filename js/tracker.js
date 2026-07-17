@@ -1,13 +1,5 @@
 /* ============================================================
    tracker.js — Student-facing bus tracker logic
-   Depends on (loaded before this file):
-     config.js  → db, CAMPUS_LOCATION, BELAGAVI_BOUNDS,
-                   SPEED_BUFFER_SIZE, CITY_DEFAULT_SPEED_MS, ETA_TRAFFIC_BUFFER
-     data/stops.js   → STOP_COORDS
-     data/routes.js  → ROUTE_STOPS
-     data/shifts.js  → SHIFT_BUSES
-     data/drivers.js → DRIVER_DB
-     utils.js        → getDistance()
    ============================================================ */
 
 // ── State ────────────────────────────────────────────────────
@@ -16,6 +8,9 @@ let currentBusKey  = null;
 let locationPoints = [];
 let speedHistory   = [];
 let routeStopIndex = 0;
+let animationId    = null;
+let lastKnownLat   = null;
+let lastKnownLng   = null;
 
 // ── Map setup ────────────────────────────────────────────────
 const belagaviBounds = L.latLngBounds(
@@ -96,8 +91,6 @@ function plotRouteStops(busKey) {
 }
 
 // ── Smooth marker animation ──────────────────────────────────
-let animationId = null;
-
 function animateMarker(marker, newLatLng) {
   if (animationId) {
     cancelAnimationFrame(animationId);
@@ -109,7 +102,15 @@ function animateMarker(marker, newLatLng) {
   const startLng = startLatLng.lng;
   const endLat = newLatLng[0];
   const endLng = newLatLng[1];
-  const duration = 1500;
+
+  // Skip animation if distance is too large (GPS jump)
+  const dist = getDistance(startLat, startLng, endLat, endLng);
+  if (dist > 0.5) {
+    marker.setLatLng(newLatLng);
+    return;
+  }
+
+  const duration = 2000;
   const startTime = performance.now();
 
   function animate(currentTime) {
@@ -133,27 +134,6 @@ function animateMarker(marker, newLatLng) {
   }
 
   animationId = requestAnimationFrame(animate);
-}
-
-  function animate(currentTime) {
-    const elapsed  = currentTime - startTime;
-    const progress = Math.min(elapsed / duration, 1);
-
-    const ease = progress < 0.5
-      ? 2 * progress * progress
-      : -1 + (4 - 2 * progress) * progress;
-
-    const lat = startLat + (endLat - startLat) * ease;
-    const lng = startLng + (endLng - startLng) * ease;
-
-    marker.setLatLng([lat, lng]);
-
-    if (progress < 1) {
-      requestAnimationFrame(animate);
-    }
-  }
-
-  requestAnimationFrame(animate);
 }
 
 // ── ETA calculation ─────────────────────────────────────────
@@ -239,6 +219,9 @@ window.selectBus = function () {
   locationPoints = [];
   speedHistory   = [];
   routeStopIndex = 0;
+  lastKnownLat   = null;
+  lastKnownLng   = null;
+
   document.getElementById('info').innerText = 'Syncing data feed...';
   document.getElementById('driverInfo').innerText =
     `Driver: ${DRIVER_DB[busKey] || 'Assigned Duty Driver'}`;
@@ -273,9 +256,11 @@ window.selectBus = function () {
 
     const latlng = [data.lat, data.lng];
     locationPoints.push(latlng);
+
+    // Sync stop index from driver
     if (typeof data.stopIndex === 'number') {
-  routeStopIndex = data.stopIndex;
-}
+      routeStopIndex = data.stopIndex;
+    }
 
     const rawSpeed = (typeof data.speed === 'number' && data.speed > 1.5) ? data.speed : null;
     if (rawSpeed !== null) {
