@@ -98,11 +98,23 @@ async function requestWakeLock() {
 }
 requestWakeLock();
 
-document.addEventListener('visibilitychange', () => {
+document.addEventListener('visibilitychange', async () => {
   if (document.visibilityState === 'visible') {
-    requestWakeLock();
+    await requestWakeLock();
   }
 });
+
+// Re-acquire wake lock on page focus
+window.addEventListener('focus', async () => {
+  await requestWakeLock();
+});
+
+// Keep GPS alive with interval check
+setInterval(() => {
+  if (isTracking && !watchId) {
+    startTracking();
+  }
+}, 5000);
   db.ref('liveLocation/' + selBus).onDisconnect().remove();
   watchId = navigator.geolocation.watchPosition(
     pos => {
