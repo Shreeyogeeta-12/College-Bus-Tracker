@@ -139,12 +139,13 @@ setInterval(() => {
       db.ref('liveLocation/' + selBus).set({
         lat,
         lng,
-        heading:   heading  || 0,
-        speed:     speed    || 0,   // m/s — used by tracker.js for real ETA
-        accuracy:  accuracy,
-        trip:      selTrip,
-        updatedAt: Date.now(),
-      });
+        heading:     heading  || 0,
+        speed:       speed    || 0,
+        accuracy:    accuracy,
+        trip:        selTrip,
+        stopIndex:   currentStopIndex,
+        updatedAt:   Date.now(),
+    });
 
       document.getElementById('gpsCount').innerText = gpsCount;
       document.getElementById('gpsVal').innerText   = lat.toFixed(5) + ', ' + lng.toFixed(5);

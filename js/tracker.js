@@ -243,6 +243,9 @@ window.selectBus = function () {
 
     const latlng = [data.lat, data.lng];
     locationPoints.push(latlng);
+    if (typeof data.stopIndex === 'number') {
+  routeStopIndex = data.stopIndex;
+}
 
     const rawSpeed = (typeof data.speed === 'number' && data.speed > 1.5) ? data.speed : null;
     if (rawSpeed !== null) {
