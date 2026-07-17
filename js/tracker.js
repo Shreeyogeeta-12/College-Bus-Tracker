@@ -96,14 +96,44 @@ function plotRouteStops(busKey) {
 }
 
 // ── Smooth marker animation ──────────────────────────────────
+let animationId = null;
+
 function animateMarker(marker, newLatLng) {
+  if (animationId) {
+    cancelAnimationFrame(animationId);
+    animationId = null;
+  }
+
   const startLatLng = marker.getLatLng();
   const startLat = startLatLng.lat;
   const startLng = startLatLng.lng;
   const endLat = newLatLng[0];
   const endLng = newLatLng[1];
-  const duration = 1000;
+  const duration = 1500;
   const startTime = performance.now();
+
+  function animate(currentTime) {
+    const elapsed  = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+
+    const ease = progress < 0.5
+      ? 2 * progress * progress
+      : -1 + (4 - 2 * progress) * progress;
+
+    const lat = startLat + (endLat - startLat) * ease;
+    const lng = startLng + (endLng - startLng) * ease;
+
+    marker.setLatLng([lat, lng]);
+
+    if (progress < 1) {
+      animationId = requestAnimationFrame(animate);
+    } else {
+      animationId = null;
+    }
+  }
+
+  animationId = requestAnimationFrame(animate);
+}
 
   function animate(currentTime) {
     const elapsed  = currentTime - startTime;
