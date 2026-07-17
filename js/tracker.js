@@ -95,6 +95,37 @@ function plotRouteStops(busKey) {
   });
 }
 
+// ── Smooth marker animation ──────────────────────────────────
+function animateMarker(marker, newLatLng) {
+  const startLatLng = marker.getLatLng();
+  const startLat = startLatLng.lat;
+  const startLng = startLatLng.lng;
+  const endLat = newLatLng[0];
+  const endLng = newLatLng[1];
+  const duration = 1000;
+  const startTime = performance.now();
+
+  function animate(currentTime) {
+    const elapsed  = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+
+    const ease = progress < 0.5
+      ? 2 * progress * progress
+      : -1 + (4 - 2 * progress) * progress;
+
+    const lat = startLat + (endLat - startLat) * ease;
+    const lng = startLng + (endLng - startLng) * ease;
+
+    marker.setLatLng([lat, lng]);
+
+    if (progress < 1) {
+      requestAnimationFrame(animate);
+    }
+  }
+
+  requestAnimationFrame(animate);
+}
+
 // ── ETA calculation ─────────────────────────────────────────
 async function processRoadETA(driverLat, driverLng) {
   try {
@@ -203,14 +234,15 @@ window.selectBus = function () {
     }
 
     if (!data || !data.lat || !data.lng) {
-      document.getElementById('info').innerText          = '🔴 Bus is currently OFFLINE';
-      document.getElementById('etaCard').style.display   = 'none';
+      document.getElementById('info').innerText        = '🔴 Bus is currently OFFLINE';
+      document.getElementById('etaCard').style.display = 'none';
       if (busMarker) map.removeLayer(busMarker);
       busMarker = null;
       return;
     }
 
     const latlng = [data.lat, data.lng];
+    locationPoints.push(latlng);
 
     const rawSpeed = (typeof data.speed === 'number' && data.speed > 1.5) ? data.speed : null;
     if (rawSpeed !== null) {
@@ -227,15 +259,13 @@ window.selectBus = function () {
           iconAnchor:[13, 13],
         }),
       }).addTo(map);
+      map.setView(latlng, 15);
     } else {
-      busMarker.setLatLng(latlng);
+      animateMarker(busMarker, latlng);
     }
 
-    if (!busMarker || locationPoints.length === 1) {
-  map.setView(latlng, 15);
-}
-    document.getElementById('info').innerText          = '🟢 Link Connection Active';
-    document.getElementById('etaCard').style.display   = 'block';
+    document.getElementById('info').innerText        = '🟢 Link Connection Active';
+    document.getElementById('etaCard').style.display = 'block';
 
     processRoadETA(data.lat, data.lng);
   });
