@@ -5,12 +5,14 @@
 // ── State ────────────────────────────────────────────────────
 let map, busMarker, dbListenerRef;
 let currentBusKey  = null;
-let locationPoints = [];
 let speedHistory   = [];
 let routeStopIndex = 0;
-let animationId    = null;
-let lastKnownLat   = null;
-let lastKnownLng   = null;
+
+// ── GPS Queue System ─────────────────────────────────────────
+const gpsQueue        = [];
+let isAnimating       = false;
+let lastPoint         = null;
+let predictionId      = null;
 
 // ── Map setup ────────────────────────────────────────────────
 const belagaviBounds = L.latLngBounds(
@@ -47,13 +49,12 @@ L.marker([CAMPUS_LOCATION.lat, CAMPUS_LOCATION.lng], {
   }),
 }).addTo(map);
 
-// ── Shift dropdown → populate bus list ──────────────────────
+// ── Shift dropdown ───────────────────────────────────────────
 window.onShiftChange = function () {
   const shift     = document.getElementById('shiftSelect').value;
   const busSelect = document.getElementById('busSelect');
   busSelect.innerHTML = '<option value="">-- Choose Bus --</option>';
   if (!shift) return;
-
   SHIFT_BUSES[shift].forEach(bus => {
     const opt = document.createElement('option');
     opt.value       = bus.id;
@@ -62,7 +63,7 @@ window.onShiftChange = function () {
   });
 };
 
-// ── Draw route stops on map ──────────────────────────────────
+// ── Draw route stops ─────────────────────────────────────────
 function plotRouteStops(busKey) {
   setTimeout(() => {
     document.getElementById('topbar').classList.add('collapsed');
@@ -70,53 +71,94 @@ function plotRouteStops(busKey) {
   }, 800);
 
   routeMarkersGroup.clearLayers();
-
   const stopsList = ROUTE_STOPS[busKey] || [];
   stopsList.forEach(stopName => {
     const coords = STOP_COORDS[stopName];
     if (!coords) return;
-
     L.circleMarker([coords.lat, coords.lng], {
       radius: 6, color: '#ffffff', weight: 1.8, fillColor: '#1a73e8', fillOpacity: 1,
     }).addTo(routeMarkersGroup);
-
     L.marker([coords.lat, coords.lng], {
       icon: L.divIcon({
         className: 'google-stop-label',
-        html:      `<span class="stop-text-pill">${stopName}</span>`,
+        html: `<span class="stop-text-pill">${stopName}</span>`,
         iconAnchor: [45, 0],
       }),
     }).addTo(routeMarkersGroup);
   });
 }
 
-// ── Smooth marker animation ──────────────────────────────────
-function animateMarker(marker, newLatLng) {
-  if (animationId) {
-    cancelAnimationFrame(animationId);
-    animationId = null;
+// ── Bus rotation based on heading ────────────────────────────
+function updateBusRotation(heading) {
+  if (!busMarker || !heading) return;
+  const el = busMarker.getElement();
+  if (el) {
+    el.style.transform = `rotate(${heading}deg)`;
+    el.style.transformOrigin = 'center';
   }
+}
 
-  const startLatLng = marker.getLatLng();
-  const startLat = startLatLng.lat;
-  const startLng = startLatLng.lng;
-  const endLat = newLatLng[0];
-  const endLng = newLatLng[1];
+// ── Queue-based smooth animation ─────────────────────────────
+function enqueuePoint(point) {
+  // Filter GPS noise — ignore if moved less than 3 meters and speed is 0
+  if (lastPoint && point.speed < 1.5) {
+    const dist = getDistance(lastPoint.lat, lastPoint.lng, point.lat, point.lng);
+    if (dist < 0.003) return; // less than 3 meters — skip
+  }
+  gpsQueue.push(point);
+  if (!isAnimating) processQueue();
+}
 
-  // Skip animation if distance is too large (GPS jump)
-  const dist = getDistance(startLat, startLng, endLat, endLng);
-  if (dist > 0.5) {
-    marker.setLatLng(newLatLng);
+function processQueue() {
+  if (gpsQueue.length === 0) {
+    isAnimating = false;
+    // Start prediction if we have last known speed and heading
+    if (lastPoint && lastPoint.speed > 1.5) {
+      startPrediction();
+    }
     return;
   }
 
-  const duration = 2000;
+  isAnimating = true;
+  stopPrediction();
+
+  const from = lastPoint;
+  const to   = gpsQueue.shift();
+
+  if (!from) {
+    // First point — just place marker
+    lastPoint = to;
+    if (busMarker) busMarker.setLatLng([to.lat, to.lng]);
+    updateBusRotation(to.heading);
+    processQueue();
+    return;
+  }
+
+  // Dynamic duration based on actual GPS interval
+  const timeDiff = to.updatedAt - from.updatedAt;
+  const duration = Math.min(Math.max(timeDiff, 500), 3000);
+
+  // Skip animation if too far (GPS jump > 500m)
+  const dist = getDistance(from.lat, from.lng, to.lat, to.lng);
+  if (dist > 0.5) {
+    lastPoint = to;
+    if (busMarker) busMarker.setLatLng([to.lat, to.lng]);
+    updateBusRotation(to.heading);
+    processQueue();
+    return;
+  }
+
+  const startLat  = from.lat;
+  const startLng  = from.lng;
+  const endLat    = to.lat;
+  const endLng    = to.lng;
   const startTime = performance.now();
 
-  function animate(currentTime) {
-    const elapsed  = currentTime - startTime;
+  function animate(now) {
+    const elapsed  = now - startTime;
     const progress = Math.min(elapsed / duration, 1);
 
+    // Smooth ease in-out
     const ease = progress < 0.5
       ? 2 * progress * progress
       : -1 + (4 - 2 * progress) * progress;
@@ -124,27 +166,66 @@ function animateMarker(marker, newLatLng) {
     const lat = startLat + (endLat - startLat) * ease;
     const lng = startLng + (endLng - startLng) * ease;
 
-    marker.setLatLng([lat, lng]);
+    if (busMarker) busMarker.setLatLng([lat, lng]);
+    updateBusRotation(to.heading);
 
     if (progress < 1) {
-      animationId = requestAnimationFrame(animate);
+      requestAnimationFrame(animate);
     } else {
-      animationId = null;
+      lastPoint = to;
+      processQueue();
     }
   }
 
-  animationId = requestAnimationFrame(animate);
+  requestAnimationFrame(animate);
 }
 
-// ── ETA calculation ─────────────────────────────────────────
+// ── Predictive movement when GPS is delayed ──────────────────
+function startPrediction() {
+  if (!lastPoint || lastPoint.speed < 1.5) return;
+  stopPrediction();
+
+  const speedMs   = lastPoint.speed;
+  const headingRad = (lastPoint.heading || 0) * Math.PI / 180;
+  let   predLat   = lastPoint.lat;
+  let   predLng   = lastPoint.lng;
+  let   lastTime  = performance.now();
+
+  function predict(now) {
+    const dt       = (now - lastTime) / 1000; // seconds
+    lastTime       = now;
+
+    // Move in heading direction at current speed
+    const dLat = (speedMs * dt * Math.cos(headingRad)) / 111320;
+    const dLng = (speedMs * dt * Math.sin(headingRad)) / (111320 * Math.cos(predLat * Math.PI / 180));
+
+    predLat += dLat;
+    predLng += dLng;
+
+    if (busMarker) busMarker.setLatLng([predLat, predLng]);
+
+    predictionId = requestAnimationFrame(predict);
+  }
+
+  predictionId = requestAnimationFrame(predict);
+}
+
+function stopPrediction() {
+  if (predictionId) {
+    cancelAnimationFrame(predictionId);
+    predictionId = null;
+  }
+}
+
+// ── ETA calculation ──────────────────────────────────────────
 async function processRoadETA(driverLat, driverLng) {
   try {
     const activeStops = ROUTE_STOPS[currentBusKey] || [];
     if (activeStops.length === 0) return;
 
     while (routeStopIndex < activeStops.length - 1) {
-      const targetName   = activeStops[routeStopIndex];
-      const targetCoord  = STOP_COORDS[targetName] || CAMPUS_LOCATION;
+      const targetName  = activeStops[routeStopIndex];
+      const targetCoord = STOP_COORDS[targetName] || CAMPUS_LOCATION;
       const distToTarget = getDistance(driverLat, driverLng, targetCoord.lat, targetCoord.lng);
       if (distToTarget < 0.3) {
         routeStopIndex++;
@@ -192,8 +273,7 @@ async function processRoadETA(driverLat, driverLng) {
       etaSeconds = olaDuration * 1.15;
     }
     const etaMinutes = Math.max(1, Math.round(etaSeconds / 60));
-
-    const isStopped = speedHistory.length >= 3 && speedHistory.every(s => s < 1.5);
+    const isStopped  = speedHistory.length >= 3 && speedHistory.every(s => s < 1.5);
 
     document.getElementById('etaTime').innerText        = isStopped ? '~' + etaMinutes : etaMinutes;
     document.getElementById('etaDestination').innerText = `Next Stop: ${destName}`;
@@ -206,7 +286,7 @@ async function processRoadETA(driverLat, driverLng) {
   }
 }
 
-// ── Bus selection → start listening to Firebase ─────────────
+// ── Bus selection ────────────────────────────────────────────
 window.selectBus = function () {
   const busKey = document.getElementById('busSelect').value;
   if (!busKey) return;
@@ -216,11 +296,11 @@ window.selectBus = function () {
   }
 
   currentBusKey  = busKey;
-  locationPoints = [];
   speedHistory   = [];
   routeStopIndex = 0;
-  lastKnownLat   = null;
-  lastKnownLng   = null;
+  lastPoint      = null;
+  gpsQueue.length = 0;
+  stopPrediction();
 
   document.getElementById('info').innerText = 'Syncing data feed...';
   document.getElementById('driverInfo').innerText =
@@ -229,10 +309,6 @@ window.selectBus = function () {
   plotRouteStops(busKey);
 
   if (busMarker) map.removeLayer(busMarker);
-  if (window.activeLivePathSnippet) {
-    map.removeLayer(window.activeLivePathSnippet);
-    window.activeLivePathSnippet = null;
-  }
   busMarker = null;
 
   dbListenerRef = db.ref('liveLocation/' + busKey).on('value', snap => {
@@ -250,37 +326,46 @@ window.selectBus = function () {
       document.getElementById('info').innerText        = '🔴 Bus is currently OFFLINE';
       document.getElementById('etaCard').style.display = 'none';
       if (busMarker) map.removeLayer(busMarker);
-      busMarker = null;
+      busMarker    = null;
+      lastPoint    = null;
+      gpsQueue.length = 0;
+      stopPrediction();
       return;
     }
 
-    const latlng = [data.lat, data.lng];
-    locationPoints.push(latlng);
+    // Create marker if not exists
+    if (!busMarker) {
+      busMarker = L.marker([data.lat, data.lng], {
+        icon: L.divIcon({
+          html:      `<div style="font-size:26px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3));transition:transform 0.3s">🚌</div>`,
+          className: '',
+          iconSize:  [26, 26],
+          iconAnchor:[13, 13],
+        }),
+      }).addTo(map);
+      map.setView([data.lat, data.lng], 15);
+    }
 
     // Sync stop index from driver
     if (typeof data.stopIndex === 'number') {
       routeStopIndex = data.stopIndex;
     }
 
+    // Collect speed history
     const rawSpeed = (typeof data.speed === 'number' && data.speed > 1.5) ? data.speed : null;
     if (rawSpeed !== null) {
       speedHistory.push(rawSpeed);
       if (speedHistory.length > SPEED_BUFFER_SIZE) speedHistory.shift();
     }
 
-    if (!busMarker) {
-      busMarker = L.marker(latlng, {
-        icon: L.divIcon({
-          html:      `<div style="font-size:26px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">🚌</div>`,
-          className: '',
-          iconSize:  [26, 26],
-          iconAnchor:[13, 13],
-        }),
-      }).addTo(map);
-      map.setView(latlng, 15);
-    } else {
-      animateMarker(busMarker, latlng);
-    }
+    // Enqueue GPS point with full data
+    enqueuePoint({
+      lat:       data.lat,
+      lng:       data.lng,
+      speed:     data.speed   || 0,
+      heading:   data.heading || 0,
+      updatedAt: data.updatedAt || Date.now(),
+    });
 
     document.getElementById('info').innerText        = '🟢 Link Connection Active';
     document.getElementById('etaCard').style.display = 'block';
@@ -289,7 +374,7 @@ window.selectBus = function () {
   });
 };
 
-// ── Topbar collapse/expand toggle ────────────────────────────
+// ── Topbar toggle ────────────────────────────────────────────
 window.toggleTopbar = function () {
   const topbar = document.getElementById('topbar');
   const btn    = document.getElementById('togglePanelBtn');
