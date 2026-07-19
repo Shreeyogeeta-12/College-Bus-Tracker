@@ -128,13 +128,19 @@ setInterval(() => {
       gpsCount++;
       const stops = ROUTE_STOPS[selBus] || [];
       let currentStopIndex = 0;
+      let passedIndex = 0;
       stops.forEach((stopName, i) => {
         const coord = STOP_COORDS[stopName];
         if (!coord) return;
         const dist = getDistance(lat, lng, coord.lat, coord.lng);
-        if (dist < 0.3) currentStopIndex = i + 1;
-     });
-     updateStopProgress(currentStopIndex);
+        if (dist < 0.3) passedIndex = i + 1;
+      });
+
+// Driver panel marks passed stops
+updateStopProgress(passedIndex);
+
+// Student panel shows NEXT upcoming stop
+const nextStopIndex = passedIndex;
 
       db.ref('liveLocation/' + selBus).set({
         lat,
@@ -143,7 +149,7 @@ setInterval(() => {
         speed:       speed    || 0,
         accuracy:    accuracy,
         trip:        selTrip,
-        stopIndex:   currentStopIndex,
+        stopIndex:   nextStopIndex,
         updatedAt:   Date.now(),
     });
 
