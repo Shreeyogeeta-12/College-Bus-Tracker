@@ -9,10 +9,10 @@ let speedHistory   = [];
 let routeStopIndex = 0;
 
 // ── GPS Queue System ─────────────────────────────────────────
-const gpsQueue        = [];
-let isAnimating       = false;
-let lastPoint         = null;
-let predictionId      = null;
+const gpsQueue   = [];
+let isAnimating  = false;
+let lastPoint    = null;
+let predictionId = null;
 
 // ── Map setup ────────────────────────────────────────────────
 const belagaviBounds = L.latLngBounds(
@@ -56,7 +56,7 @@ window.onShiftChange = function () {
   busSelect.innerHTML = '<option value="">-- Choose Bus --</option>';
   if (!shift) return;
   SHIFT_BUSES[shift].forEach(bus => {
-    const opt = document.createElement('option');
+    const opt       = document.createElement('option');
     opt.value       = bus.id;
     opt.textContent = bus.label;
     busSelect.appendChild(opt);
@@ -88,22 +88,21 @@ function plotRouteStops(busKey) {
   });
 }
 
-// ── Bus rotation based on heading ────────────────────────────
+// ── Bus rotation ─────────────────────────────────────────────
 function updateBusRotation(heading) {
   if (!busMarker || !heading) return;
   const el = busMarker.getElement();
   if (el) {
-    el.style.transform = `rotate(${heading}deg)`;
-    el.style.transformOrigin = 'center';
+    const div = el.querySelector('div');
+    if (div) div.style.transform = `rotate(${heading}deg)`;
   }
 }
 
 // ── Queue-based smooth animation ─────────────────────────────
 function enqueuePoint(point) {
-  // Filter GPS noise — ignore if moved less than 3 meters and speed is 0
   if (lastPoint && point.speed < 1.5) {
     const dist = getDistance(lastPoint.lat, lastPoint.lng, point.lat, point.lng);
-    if (dist < 0.003) return; // less than 3 meters — skip
+    if (dist < 0.003) return;
   }
   gpsQueue.push(point);
   if (!isAnimating) processQueue();
@@ -112,7 +111,6 @@ function enqueuePoint(point) {
 function processQueue() {
   if (gpsQueue.length === 0) {
     isAnimating = false;
-    // Start prediction if we have last known speed and heading
     if (lastPoint && lastPoint.speed > 1.5) {
       startPrediction();
     }
@@ -126,7 +124,6 @@ function processQueue() {
   const to   = gpsQueue.shift();
 
   if (!from) {
-    // First point — just place marker
     lastPoint = to;
     if (busMarker) busMarker.setLatLng([to.lat, to.lng]);
     updateBusRotation(to.heading);
@@ -134,11 +131,9 @@ function processQueue() {
     return;
   }
 
-  // Dynamic duration based on actual GPS interval
   const timeDiff = to.updatedAt - from.updatedAt;
   const duration = Math.min(Math.max(timeDiff, 500), 3000);
 
-  // Skip animation if too far (GPS jump > 500m)
   const dist = getDistance(from.lat, from.lng, to.lat, to.lng);
   if (dist > 0.5) {
     lastPoint = to;
@@ -158,7 +153,6 @@ function processQueue() {
     const elapsed  = now - startTime;
     const progress = Math.min(elapsed / duration, 1);
 
-    // Smooth ease in-out
     const ease = progress < 0.5
       ? 2 * progress * progress
       : -1 + (4 - 2 * progress) * progress;
@@ -180,30 +174,29 @@ function processQueue() {
   requestAnimationFrame(animate);
 }
 
-// ── Predictive movement when GPS is delayed ──────────────────
+// ── Predictive movement ───────────────────────────────────────
 function startPrediction() {
   if (!lastPoint || lastPoint.speed < 1.5) return;
   stopPrediction();
 
-  const speedMs   = lastPoint.speed;
+  const speedMs    = lastPoint.speed;
   const headingRad = (lastPoint.heading || 0) * Math.PI / 180;
-  let   predLat   = lastPoint.lat;
-  let   predLng   = lastPoint.lng;
-  let   lastTime  = performance.now();
+  let   predLat    = lastPoint.lat;
+  let   predLng    = lastPoint.lng;
+  let   lastTime   = performance.now();
 
   function predict(now) {
-    const dt       = (now - lastTime) / 1000; // seconds
-    lastTime       = now;
+    const dt   = (now - lastTime) / 1000;
+    lastTime   = now;
 
-    // Move in heading direction at current speed
     const dLat = (speedMs * dt * Math.cos(headingRad)) / 111320;
-    const dLng = (speedMs * dt * Math.sin(headingRad)) / (111320 * Math.cos(predLat * Math.PI / 180));
+    const dLng = (speedMs * dt * Math.sin(headingRad)) /
+                 (111320 * Math.cos(predLat * Math.PI / 180));
 
     predLat += dLat;
     predLng += dLng;
 
     if (busMarker) busMarker.setLatLng([predLat, predLng]);
-
     predictionId = requestAnimationFrame(predict);
   }
 
@@ -223,18 +216,9 @@ async function processRoadETA(driverLat, driverLng) {
     const activeStops = ROUTE_STOPS[currentBusKey] || [];
     if (activeStops.length === 0) return;
 
-    while (routeStopIndex < activeStops.length - 1) {
-      const targetName  = activeStops[routeStopIndex];
-      const targetCoord = STOP_COORDS[targetName] || CAMPUS_LOCATION;
-      const distToTarget = getDistance(driverLat, driverLng, targetCoord.lat, targetCoord.lng);
-      if (distToTarget < 0.3) {
-        routeStopIndex++;
-      } else {
-        break;
-      }
-    }
-
+    // Use routeStopIndex synced from driver — no recalculation needed
     const destName  = activeStops[routeStopIndex];
+    if (!destName) return;
     const destCoord = STOP_COORDS[destName] || CAMPUS_LOCATION;
 
     const response = await fetch(
@@ -252,8 +236,10 @@ async function processRoadETA(driverLat, driverLng) {
     const leg = json.routes[0].legs.find(l => l != null);
     if (!leg) return;
 
-    const roadDistanceMeters = leg.distance?.value ?? leg.distance_meters ?? (typeof leg.distance === 'number' ? leg.distance : 0);
-    const olaDuration        = leg.duration?.value ?? leg.duration_seconds ?? (typeof leg.duration === 'number' ? leg.duration : 0);
+    const roadDistanceMeters = leg.distance?.value ?? leg.distance_meters ??
+      (typeof leg.distance === 'number' ? leg.distance : 0);
+    const olaDuration = leg.duration?.value ?? leg.duration_seconds ??
+      (typeof leg.duration === 'number' ? leg.duration : 0);
     if (!roadDistanceMeters || !olaDuration) return;
 
     const roadDistanceKm = (roadDistanceMeters / 1000).toFixed(1);
@@ -272,8 +258,10 @@ async function processRoadETA(driverLat, driverLng) {
     } else {
       etaSeconds = olaDuration * 1.15;
     }
+
     const etaMinutes = Math.max(1, Math.round(etaSeconds / 60));
-    const isStopped  = speedHistory.length >= 3 && speedHistory.every(s => s < 1.5);
+    const isStopped  = speedHistory.length >= 3 &&
+                       speedHistory.every(s => s < 1.5);
 
     document.getElementById('etaTime').innerText        = isStopped ? '~' + etaMinutes : etaMinutes;
     document.getElementById('etaDestination').innerText = `Next Stop: ${destName}`;
@@ -295,10 +283,10 @@ window.selectBus = function () {
     db.ref('liveLocation/' + currentBusKey).off('value', dbListenerRef);
   }
 
-  currentBusKey  = busKey;
-  speedHistory   = [];
-  routeStopIndex = 0;
-  lastPoint      = null;
+  currentBusKey   = busKey;
+  speedHistory    = [];
+  routeStopIndex  = 0;
+  lastPoint       = null;
   gpsQueue.length = 0;
   stopPrediction();
 
@@ -326,18 +314,17 @@ window.selectBus = function () {
       document.getElementById('info').innerText        = '🔴 Bus is currently OFFLINE';
       document.getElementById('etaCard').style.display = 'none';
       if (busMarker) map.removeLayer(busMarker);
-      busMarker    = null;
-      lastPoint    = null;
+      busMarker       = null;
+      lastPoint       = null;
       gpsQueue.length = 0;
       stopPrediction();
       return;
     }
 
-    // Create marker if not exists
     if (!busMarker) {
       busMarker = L.marker([data.lat, data.lng], {
         icon: L.divIcon({
-          html:      `<div style="font-size:26px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3));transition:transform 0.3s">🚌</div>`,
+          html:      `<div style="font-size:26px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">🚌</div>`,
           className: '',
           iconSize:  [26, 26],
           iconAnchor:[13, 13],
@@ -346,19 +333,17 @@ window.selectBus = function () {
       map.setView([data.lat, data.lng], 15);
     }
 
-    // Sync stop index from driver
+    // Sync stop index from driver panel
     if (typeof data.stopIndex === 'number') {
       routeStopIndex = data.stopIndex;
     }
 
-    // Collect speed history
     const rawSpeed = (typeof data.speed === 'number' && data.speed > 1.5) ? data.speed : null;
     if (rawSpeed !== null) {
       speedHistory.push(rawSpeed);
       if (speedHistory.length > SPEED_BUFFER_SIZE) speedHistory.shift();
     }
 
-    // Enqueue GPS point with full data
     enqueuePoint({
       lat:       data.lat,
       lng:       data.lng,

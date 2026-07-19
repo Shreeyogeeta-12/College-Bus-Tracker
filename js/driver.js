@@ -1,9 +1,5 @@
 /* ============================================================
    driver.js — Driver panel logic
-   Depends on (loaded before this file):
-     config.js       → db
-     data/routes.js  → ROUTE_STOPS
-     data/shifts.js  → SHIFT_BUSES
    ============================================================ */
 
 // ── State ────────────────────────────────────────────────────
@@ -12,6 +8,7 @@ let watchId    = null;
 let gpsCount   = 0;
 let selBus     = '';
 let selTrip    = '';
+let gpsBuffer  = [];
 
 // ── Clock ────────────────────────────────────────────────────
 setInterval(() => {
@@ -19,6 +16,13 @@ setInterval(() => {
   document.getElementById('clock').innerText =
     String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0');
 }, 1000);
+
+// ── Keep GPS alive ───────────────────────────────────────────
+setInterval(() => {
+  if (isTracking && !watchId) {
+    startTracking();
+  }
+}, 5000);
 
 // ── Shift change → populate bus dropdown ─────────────────────
 function onTripChange() {
@@ -49,12 +53,9 @@ function onBusChange() {
   if (!selBus || !selTrip) return;
 
   const stops = ROUTE_STOPS[selBus] || [];
-
-  // Last stop is the final destination
   document.getElementById('nextStop').innerText = stops[stops.length - 1] || '—';
 
-  // Build route progress list
-document.getElementById('routeList').innerHTML = stops.map((name, i) => `
+  document.getElementById('routeList').innerHTML = stops.map((name, i) => `
     <div class="rstop" id="stop-${i}">
       <div class="sdot ${i === 0 ? 'cur' : ''}"></div>
       <div class="sname">${name}</div>
@@ -62,7 +63,6 @@ document.getElementById('routeList').innerHTML = stops.map((name, i) => `
     </div>
   `).join('');
 
-  // Share link for students
   document.getElementById('shareLink').innerText =
     `${window.location.origin}/index.html?bus=${selBus}`;
 }
@@ -74,17 +74,7 @@ function toggleTracking() {
   isTracking ? stopTracking() : startTracking();
 }
 
-// ── Start sharing GPS to Firebase ───────────────────────────
-function startTracking() {
-  isTracking = true;
-  document.getElementById('bigCircle').classList.add('live');
-  document.getElementById('ctext').innerText  = 'SHARING LIVE';
-  document.getElementById('badge').classList.add('live');
-  document.getElementById('bdot').classList.add('live');
-  document.getElementById('btext').innerText  = 'Location LIVE';
-
-  // Keep screen awake while sharing
- 
+// ── Wake Lock ────────────────────────────────────────────────
 let wakeLock = null;
 async function requestWakeLock() {
   try {
@@ -96,7 +86,6 @@ async function requestWakeLock() {
     console.log('Wake lock failed:', err);
   }
 }
-requestWakeLock();
 
 document.addEventListener('visibilitychange', async () => {
   if (document.visibilityState === 'visible') {
@@ -104,30 +93,55 @@ document.addEventListener('visibilitychange', async () => {
   }
 });
 
-// Re-acquire wake lock on page focus
 window.addEventListener('focus', async () => {
   await requestWakeLock();
 });
 
-// Keep GPS alive with interval check
-setInterval(() => {
-  if (isTracking && !watchId) {
-    startTracking();
-  }
-}, 5000);
+// ── GPS Smoothing ─────────────────────────────────────────────
+function getSmoothedLocation(lat, lng) {
+  gpsBuffer.push({ lat, lng });
+  if (gpsBuffer.length > 5) gpsBuffer.shift();
+  const smoothLat = gpsBuffer.reduce((a, b) => a + b.lat, 0) / gpsBuffer.length;
+  const smoothLng = gpsBuffer.reduce((a, b) => a + b.lng, 0) / gpsBuffer.length;
+  return { lat: smoothLat, lng: smoothLng };
+}
+
+// ── Start sharing GPS ────────────────────────────────────────
+function startTracking() {
+  isTracking = true;
+  gpsBuffer  = [];
+
+  document.getElementById('bigCircle').classList.add('live');
+  document.getElementById('ctext').innerText  = 'SHARING LIVE';
+  document.getElementById('badge').classList.add('live');
+  document.getElementById('bdot').classList.add('live');
+  document.getElementById('btext').innerText  = 'Location LIVE';
+
+  requestWakeLock();
+
   db.ref('liveLocation/' + selBus).onDisconnect().remove();
+
   watchId = navigator.geolocation.watchPosition(
     pos => {
-      const { latitude: lat, longitude: lng, heading, speed, accuracy } = pos.coords;
-      
-      if (accuracy > 3000) {
-         document.getElementById('gpsVal').innerText = 'Low Accuracy GPS: ' + accuracy.toFixed(1) + 'm';
-         return;
+      const { latitude: rawLat, longitude: rawLng, heading, speed, accuracy } = pos.coords;
+
+      // Show accuracy — never block GPS
+      if (accuracy > 100) {
+        document.getElementById('gpsVal').innerText =
+          '⚠️ GPS: ' + Math.round(accuracy) + 'm — Move outdoors for better accuracy';
+      } else {
+        document.getElementById('gpsVal').innerText =
+          '✅ GPS: ' + Math.round(accuracy) + 'm — ' + rawLat.toFixed(5) + ', ' + rawLng.toFixed(5);
       }
 
       gpsCount++;
+      document.getElementById('gpsCount').innerText = gpsCount;
+
+      // Smooth GPS readings
+      const { lat, lng } = getSmoothedLocation(rawLat, rawLng);
+
+      // Calculate which stop has been passed
       const stops = ROUTE_STOPS[selBus] || [];
-      let currentStopIndex = 0;
       let passedIndex = 0;
       stops.forEach((stopName, i) => {
         const coord = STOP_COORDS[stopName];
@@ -136,39 +150,38 @@ setInterval(() => {
         if (dist < 0.3) passedIndex = i + 1;
       });
 
-// Driver panel marks passed stops
-updateStopProgress(passedIndex);
+      // Update driver panel stop progress
+      updateStopProgress(passedIndex);
 
-// Student panel shows NEXT upcoming stop
-const nextStopIndex = passedIndex;
-
+      // Send to Firebase
       db.ref('liveLocation/' + selBus).set({
         lat,
         lng,
-        heading:     heading  || 0,
-        speed:       speed    || 0,
-        accuracy:    accuracy,
-        trip:        selTrip,
-        stopIndex:   nextStopIndex,
-        updatedAt:   Date.now(),
-    });
-
-      document.getElementById('gpsCount').innerText = gpsCount;
-      document.getElementById('gpsVal').innerText   = lat.toFixed(5) + ', ' + lng.toFixed(5);
+        heading:   heading   || 0,
+        speed:     speed     || 0,
+        accuracy:  accuracy,
+        trip:      selTrip,
+        stopIndex: passedIndex,
+        updatedAt: Date.now(),
+      });
     },
     err => {
       document.getElementById('gpsVal').innerText = 'GPS Error: ' + err.message;
     },
-    { enableHighAccuracy: true, maximumAge: 0 }
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
   );
 }
 
 // ── Stop sharing GPS ─────────────────────────────────────────
 function stopTracking() {
   isTracking = false;
-  if (watchId) navigator.geolocation.clearWatch(watchId);
+  gpsBuffer  = [];
 
-  // Remove from Firebase so students see bus as offline
+  if (watchId) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
+
   db.ref('liveLocation/' + selBus).remove();
 
   document.getElementById('bigCircle').classList.remove('live');
@@ -180,25 +193,27 @@ function stopTracking() {
   gpsCount = 0;
   document.getElementById('gpsCount').innerText = '0';
 }
+
+// ── Update stop progress ─────────────────────────────────────
 function updateStopProgress(currentIndex) {
   const stops = ROUTE_STOPS[selBus] || [];
   stops.forEach((name, i) => {
-    const dot = document.querySelector(`#stop-${i} .sdot`);
+    const dot    = document.querySelector(`#stop-${i} .sdot`);
     const status = document.querySelector(`#stop-${i} .sstatus`);
     if (!dot || !status) return;
 
     if (i < currentIndex) {
       dot.style.background = '#f59e0b';
-      status.innerText = '✓ Passed';
-      status.style.color = '#f59e0b';
+      status.innerText     = '✓ Passed';
+      status.style.color   = '#f59e0b';
     } else if (i === currentIndex) {
       dot.style.background = '#1a73e8';
-      status.innerText = '● Here';
-      status.style.color = '#1a73e8';
+      status.innerText     = '● Here';
+      status.style.color   = '#1a73e8';
     } else {
       dot.style.background = '#ccc';
-      status.innerText = 'Upcoming';
-      status.style.color = '#888';
+      status.innerText     = 'Upcoming';
+      status.style.color   = '#888';
     }
   });
 }
