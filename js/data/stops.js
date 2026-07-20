@@ -58,6 +58,7 @@ const STOP_COORDS = {
 
   // ── Hanuman Nagar / Sadashiv Nagar area ─────────────────────
   "Hindalga Ganesh Temple":   { lat: 15.868964004747033, lng: 74.48942158165639 },
+  "Hindalga jail":            { lat: 15.8974           , lng: 74.4795           },
   "Ganesh Temple":            { lat: 15.868964004747033, lng: 74.48942158165639 },
   "Kuvempu Nagar":            { lat: 15.874813628415831, lng: 74.4914875069715  },
   "KLE School":               { lat: 15.879464938336959, lng: 74.4849004606231  },
@@ -66,24 +67,35 @@ const STOP_COORDS = {
   "Hanuman Nagar 2nd Stop":   { lat: 15.880412109390043, lng: 74.49287119936872 },
   "Hanuman Nagar Circle":     { lat: 15.88020935614367,  lng: 74.49658544912198 },
   "Hanuman Nagar":            { lat: 15.88020935614367,  lng: 74.49658544912198 },
+  "Vinayak circle":           { lat: 15.8913          ,  lng: 74.5103           },
+  "Vinayak nagar":            { lat: 15.8906          ,  lng: 74.5097           },
+  "Hostel":                   { lat: 15.      ,          lng: 74.               },
   "Sadashiv Nagar":           { lat: 15.87436655611429,  lng: 74.5079470939882  },
+  "Sadashiv nagar last stop": { lat: 15.8767          ,  lng: 74.5093           },
+  "Rail Nagar":               { lat: 15.8675          ,  lng: 74.5312           },
+  "NCC Ground":               { lat: 15.873169        ,  lng: 74.5225},
   "TV Centre":                { lat: 15.876,             lng: 74.502             }, // approx Sadashiv Nagar area
   "Shri nagar stop":          { lat: 15.880628133488766, lng: 74.5295568729132  }, // approx Shrinagar garden
   "Shrinagar":                { lat: 15.880628133488766, lng: 74.5295568729132  },
 
   // ── Ganeshpur / Indal Colony area ───────────────────────────
   "Ganeshpur":                { lat: 15.8895,            lng: 74.4998            },
+  "Pipeline":                 { lat: 15.8941,            lng: 74.5028            },
   "Indal Colony":             { lat: 15.8955,            lng: 74.5212            },
+  "Indal bridge":             { lat: 15.8903,            lng: 74.5244            },
+  
 
   // ── Vadagaon / Goa Ves area ─────────────────────────────────
   "Congress Road":            { lat: 15.8368,            lng: 74.5008            },
   "Vadagaon":                 { lat: 15.8211,            lng: 74.5072            },
   "Nath Pai Circle":          { lat: 15.840318884689,    lng: 74.51742348182789 },
   "Goa Ves":                  { lat: 15.8429,            lng: 74.5028            },
+  "Hari mandir":              { lat: 15.8422,            lng: 74.5058            },
   "RPD Cross":                { lat: 15.8354,            lng: 74.4972            },
   "Shahapur":                 { lat: 15.8338,            lng: 74.5162            },
   "Tukaram Bank":             { lat: 15.846454412651212, lng: 74.51622855097081 },
   "Bhagya Nagar":             { lat: 15.8341,            lng: 74.4985            },
+  "Girls hostel":             { lat: 15.8365,            lng: 74.5108            },
   "Raghunath Peth":           { lat: 15.8338,            lng: 74.5068            },
 
   // ── Other areas ─────────────────────────────────────────────
@@ -94,10 +106,25 @@ const STOP_COORDS = {
   "Mandoli Road":             { lat: 15.8315,            lng: 74.4795            },
   "Guru Prasad Colony":       { lat: 15.8431,            lng: 74.4941            },
   "Shahu Nagar":              { lat: 15.8162,            lng: 74.5295            },
+  "Shahu nagar cross":        { lat: 15.8752,            lng: 74.5298            },
   "Nehru Nagar":              { lat: 15.8762,            lng: 74.5115            },
+  "Shri Laxmi complex" :      { lat: 15.8755,            lng: 74.5244            }, 
   "Camp":                     { lat: 15.8512,            lng: 74.5035            },
   "Kakati":                   { lat: 15.9398,            lng: 74.5204            },
+  "Kakati Police station":    { lat: 15.9328,            lng: 74.5264            },
+  "Honaga":                   { lat: 15.9575,            lng: 74.5199            },
+  "Yamanapur":                { lat: 15.9080,            lng: 74.5298            },
+  "Visha Dhaba":              { lat: 15.9157,            lng: 74.5242            },
+  "Nexa showroom":            { lat: 15.9016,            lng: 74.5097            },
+  "Basavana temple":          { lat: 15.   ,             lng: 74.                },
   "Khanapur":                 { lat: 15.6394,            lng: 74.5185            },
   "BCM Hostel":               { lat: 15.7915,            lng: 74.4421            },
   "Machhe":                   { lat: 15.7952,            lng: 74.4485            },
+  "Vijay nagar second stop":  { lat: 15.8920,            lng: 74.4939            },
+  "Sulaga":                   { lat: 15.9378,            lng: 74.5447            },
+  "Uchagaon cross":           { lat: 15.8928,            lng: 74.4754            },
+  "Kranti nagar":             { lat: 15.8943,            lng: 74.4988            },
+
+
+
 };
