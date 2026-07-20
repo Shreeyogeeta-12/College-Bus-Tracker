@@ -88,17 +88,12 @@ function plotRouteStops(busKey) {
   });
 }
 
-// ── Bus rotation ─────────────────────────────────────────────
-function updateBusRotation(heading) {
-  // Disabled — teardrop icon always stays upright
-}
+// ── Bus rotation — disabled for teardrop icon ────────────────
+function updateBusRotation(heading) {}
 
 // ── Queue-based smooth animation ─────────────────────────────
 function enqueuePoint(point) {
-  if (lastPoint && point.speed < 1.5) {
-    const dist = getDistance(lastPoint.lat, lastPoint.lng, point.lat, point.lng);
-    if (dist < 0.003) return;
-  }
+  // No filtering — always enqueue every GPS update
   gpsQueue.push(point);
   if (!isAnimating) processQueue();
 }
@@ -121,7 +116,6 @@ function processQueue() {
   if (!from) {
     lastPoint = to;
     if (busMarker) busMarker.setLatLng([to.lat, to.lng]);
-    updateBusRotation(to.heading);
     processQueue();
     return;
   }
@@ -133,7 +127,6 @@ function processQueue() {
   if (dist > 0.5) {
     lastPoint = to;
     if (busMarker) busMarker.setLatLng([to.lat, to.lng]);
-    updateBusRotation(to.heading);
     processQueue();
     return;
   }
@@ -156,7 +149,6 @@ function processQueue() {
     const lng = startLng + (endLng - startLng) * ease;
 
     if (busMarker) busMarker.setLatLng([lat, lng]);
-    updateBusRotation(to.heading);
 
     if (progress < 1) {
       requestAnimationFrame(animate);
@@ -181,8 +173,8 @@ function startPrediction() {
   let   lastTime   = performance.now();
 
   function predict(now) {
-    const dt   = (now - lastTime) / 1000;
-    lastTime   = now;
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
 
     const dLat = (speedMs * dt * Math.cos(headingRad)) / 111320;
     const dLng = (speedMs * dt * Math.sin(headingRad)) /
@@ -211,7 +203,6 @@ async function processRoadETA(driverLat, driverLng) {
     const activeStops = ROUTE_STOPS[currentBusKey] || [];
     if (activeStops.length === 0) return;
 
-    // Use routeStopIndex synced from driver — no recalculation needed
     const destName  = activeStops[routeStopIndex];
     if (!destName) return;
     const destCoord = STOP_COORDS[destName] || CAMPUS_LOCATION;
@@ -317,26 +308,25 @@ window.selectBus = function () {
     }
 
     if (!busMarker) {
-          busMarker = L.marker([data.lat, data.lng], {
-            icon: L.divIcon({
-              html: `
-                <div style="position:relative;width:44px;height:56px;text-align:center;">
-                  <svg width="44" height="56" viewBox="0 0 44 56" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M22 2 C11 2 2 11 2 22 C2 36 22 54 22 54 C22 54 42 36 42 22 C42 11 33 2 22 2Z" fill="#dc2626" stroke="white" stroke-width="2"/>
-                    <circle cx="22" cy="21" r="13" fill="white"/>
-                  </svg>
-                  <div style="position:absolute;top:6px;left:50%;transform:translateX(-50%);font-size:19px;line-height:1;">🚌</div>
-                </div>
-             `,
-              className: '',
-              iconSize:  [44, 56],
-              iconAnchor:[22, 56],
-            }),
-          }).addTo(map);
-          map.setView([data.lat, data.lng], 15);
-        }
+      busMarker = L.marker([data.lat, data.lng], {
+        icon: L.divIcon({
+          html: `
+            <div style="position:relative;width:44px;height:56px;text-align:center;">
+              <svg width="44" height="56" viewBox="0 0 44 56" xmlns="http://www.w3.org/2000/svg">
+                <path d="M22 2 C11 2 2 11 2 22 C2 36 22 54 22 54 C22 54 42 36 42 22 C42 11 33 2 22 2Z" fill="#dc2626" stroke="white" stroke-width="2"/>
+                <circle cx="22" cy="21" r="13" fill="white"/>
+              </svg>
+              <div style="position:absolute;top:6px;left:50%;transform:translateX(-50%);font-size:19px;line-height:1;">🚌</div>
+            </div>
+          `,
+          className:  '',
+          iconSize:   [44, 56],
+          iconAnchor: [22, 56],
+        }),
+      }).addTo(map);
+      map.setView([data.lat, data.lng], 15);
+    }
 
-    // Sync stop index from driver panel
     if (typeof data.stopIndex === 'number') {
       routeStopIndex = data.stopIndex;
     }
