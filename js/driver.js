@@ -100,7 +100,7 @@ window.addEventListener('focus', async () => {
 // ── GPS Smoothing ─────────────────────────────────────────────
 function getSmoothedLocation(lat, lng) {
   gpsBuffer.push({ lat, lng });
-  if (gpsBuffer.length > 5) gpsBuffer.shift();
+  if (gpsBuffer.length > 2) gpsBuffer.shift();
   const smoothLat = gpsBuffer.reduce((a, b) => a + b.lat, 0) / gpsBuffer.length;
   const smoothLng = gpsBuffer.reduce((a, b) => a + b.lng, 0) / gpsBuffer.length;
   return { lat: smoothLat, lng: smoothLng };
