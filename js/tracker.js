@@ -90,17 +90,7 @@ function plotRouteStops(busKey) {
 
 // ── Bus rotation ─────────────────────────────────────────────
 function updateBusRotation(heading) {
-  if (!busMarker) return;
-  if (!heading || heading === 0) return;
-  const el = busMarker.getElement();
-  if (el) {
-    const div = el.querySelector('div');
-    if (div) {
-      div.style.transform      = `rotate(${heading}deg)`;
-      div.style.transformOrigin = '13px 13px';
-      div.style.display         = 'inline-block';
-    }
-  }
+  // Disabled — teardrop icon always stays upright
 }
 
 // ── Queue-based smooth animation ─────────────────────────────
@@ -340,7 +330,7 @@ window.selectBus = function () {
              `,
               className: '',
               iconSize:  [44, 56],
-              iconAnchor:[22, 54],
+              iconAnchor:[22, 56],
             }),
           }).addTo(map);
           map.setView([data.lat, data.lng], 15);
