@@ -90,11 +90,16 @@ function plotRouteStops(busKey) {
 
 // ── Bus rotation ─────────────────────────────────────────────
 function updateBusRotation(heading) {
-  if (!busMarker || !heading) return;
+  if (!busMarker) return;
+  if (!heading || heading === 0) return;
   const el = busMarker.getElement();
   if (el) {
     const div = el.querySelector('div');
-    if (div) div.style.transform = `rotate(${heading}deg)`;
+    if (div) {
+      div.style.transform      = `rotate(${heading}deg)`;
+      div.style.transformOrigin = '13px 13px';
+      div.style.display         = 'inline-block';
+    }
   }
 }
 
