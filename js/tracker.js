@@ -88,41 +88,38 @@ function plotRouteStops(busKey) {
   });
 }
 
-// ── Bus rotation ────────────────────────────────────────────
 // ── Bus icon with rotation ───────────────────────────────────
 function updateBusIcon(heading) {
   const rotation = heading || 0;
   return L.divIcon({
     className: '',
-    html: `<div style="transform:rotate(${rotation}deg);transform-origin:center;">
-      <svg width="48" height="58" viewBox="0 0 48 58" xmlns="http://www.w3.org/2000/svg">
-        <path d="M24 0C13.5 0 5 8.5 5 19C5 33 24 58 24 58C24 58 43 33 43 19C43 8.5 34.5 0 24 0Z"
-              fill="#dc2626" stroke="white" stroke-width="1.5"/>
-        <circle cx="24" cy="19" r="13" fill="white"/>
-        <g transform="translate(10,10) scale(0.58)">
-          <rect x="2" y="6" width="34" height="20" rx="3" fill="#1a73e8"/>
-          <rect x="5" y="9" width="7" height="7" rx="1" fill="white"/>
-          <rect x="15" y="9" width="7" height="7" rx="1" fill="white"/>
-          <rect x="25" y="9" width="7" height="7" rx="1" fill="white"/>
-          <rect x="25" y="17" width="7" height="9" rx="1" fill="white"/>
-          <circle cx="9" cy="27" r="4" fill="#333"/>
-          <circle cx="9" cy="27" r="2" fill="#999"/>
-          <circle cx="29" cy="27" r="4" fill="#333"/>
-          <circle cx="29" cy="27" r="2" fill="#999"/>
-        </g>
-      </svg>
-    </div>`,
-    iconSize:    [48, 58],
-    iconAnchor:  [24, 58],
+    html: `
+      <div style="transform:rotate(${rotation}deg);transform-origin:center;">
+        <svg width="48" height="58" viewBox="0 0 48 58" xmlns="http://www.w3.org/2000/svg">
+          <path d="M24 0C13.5 0 5 8.5 5 19C5 33 24 58 24 58C24 58 43 33 43 19C43 8.5 34.5 0 24 0Z"
+                fill="#dc2626" stroke="white" stroke-width="1.5"/>
+          <circle cx="24" cy="19" r="13" fill="white"/>
+          <g transform="translate(10,10) scale(0.58)">
+            <rect x="2" y="6" width="34" height="20" rx="3" fill="#1a73e8"/>
+            <rect x="5" y="9" width="7" height="7" rx="1" fill="white"/>
+            <rect x="15" y="9" width="7" height="7" rx="1" fill="white"/>
+            <rect x="25" y="9" width="7" height="7" rx="1" fill="white"/>
+            <rect x="25" y="17" width="7" height="9" rx="1" fill="white"/>
+            <circle cx="9" cy="27" r="4" fill="#333"/>
+            <circle cx="9" cy="27" r="2" fill="#999"/>
+            <circle cx="29" cy="27" r="4" fill="#333"/>
+            <circle cx="29" cy="27" r="2" fill="#999"/>
+          </g>
+        </svg>
+      </div>
+    `,
+    iconSize:   [48, 58],
+    iconAnchor: [24, 58],
   });
 }
 
 // ── Queue-based smooth animation ─────────────────────────────
 function enqueuePoint(point) {
-  if (lastPoint && point.speed < 0.5) {
-    const dist = getDistance(lastPoint.lat, lastPoint.lng, point.lat, point.lng);
-    if (dist < 0.001) return;
-  }
   gpsQueue.push(point);
   if (!isAnimating) processQueue();
 }
@@ -144,8 +141,10 @@ function processQueue() {
 
   if (!from) {
     lastPoint = to;
-    if (busMarker) busMarker.setLatLng([to.lat, to.lng]);
-    updateBusRotation(to.heading);
+    if (busMarker) {
+      busMarker.setLatLng([to.lat, to.lng]);
+      busMarker.setIcon(updateBusIcon(to.heading));
+    }
     processQueue();
     return;
   }
@@ -156,8 +155,10 @@ function processQueue() {
   const dist = getDistance(from.lat, from.lng, to.lat, to.lng);
   if (dist > 0.5) {
     lastPoint = to;
-    if (busMarker) busMarker.setLatLng([to.lat, to.lng]);
-    updateBusRotation(to.heading);
+    if (busMarker) {
+      busMarker.setLatLng([to.lat, to.lng]);
+      busMarker.setIcon(updateBusIcon(to.heading));
+    }
     processQueue();
     return;
   }
@@ -180,12 +181,12 @@ function processQueue() {
     const lng = startLng + (endLng - startLng) * ease;
 
     if (busMarker) busMarker.setLatLng([lat, lng]);
-    updateBusRotation(to.heading);
 
     if (progress < 1) {
       requestAnimationFrame(animate);
     } else {
       lastPoint = to;
+      if (busMarker) busMarker.setIcon(updateBusIcon(to.heading));
       processQueue();
     }
   }
@@ -205,8 +206,8 @@ function startPrediction() {
   let   lastTime   = performance.now();
 
   function predict(now) {
-    const dt   = (now - lastTime) / 1000;
-    lastTime   = now;
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
 
     const dLat = (speedMs * dt * Math.cos(headingRad)) / 111320;
     const dLng = (speedMs * dt * Math.sin(headingRad)) /
@@ -235,7 +236,19 @@ async function processRoadETA(driverLat, driverLng) {
     const activeStops = ROUTE_STOPS[currentBusKey] || [];
     if (activeStops.length === 0) return;
 
-    // Use routeStopIndex synced from driver — no recalculation needed
+    // ── Advance stop ONLY when bus is within 150m of current stop ──
+    const currentStopName  = activeStops[routeStopIndex];
+    const currentStopCoord = STOP_COORDS[currentStopName];
+    if (currentStopCoord) {
+      const distToCurrentStop = getDistance(
+        driverLat, driverLng,
+        currentStopCoord.lat, currentStopCoord.lng
+      );
+      if (distToCurrentStop < 0.15 && routeStopIndex < activeStops.length - 1) {
+        routeStopIndex++;
+      }
+    }
+
     const destName  = activeStops[routeStopIndex];
     if (!destName) return;
     const destCoord = STOP_COORDS[destName] || CAMPUS_LOCATION;
@@ -341,20 +354,11 @@ window.selectBus = function () {
     }
 
     if (!busMarker) {
-     busMarker = L.marker([data.lat, data.lng], {
-       icon: L.divIcon({
-         html: `<div style="font-size:26px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3));transform:scaleX(-1);">🚌</div>`,
-         className: '',
-         iconSize:  [26, 26],
-         iconAnchor:[13, 13],
-      }),
-    }).addTo(map);
+      busMarker = L.marker([data.lat, data.lng], {
+        icon:         updateBusIcon(data.heading || 0),
+        zIndexOffset: 1000,
+      }).addTo(map);
       map.setView([data.lat, data.lng], 15);
-    }
-
-    // Sync stop index from driver panel
-    if (typeof data.stopIndex === 'number') {
-      routeStopIndex = data.stopIndex;
     }
 
     const rawSpeed = (typeof data.speed === 'number' && data.speed > 1.5) ? data.speed : null;
