@@ -88,7 +88,7 @@ function plotRouteStops(busKey) {
   });
 }
 
-// ── Bus rotation ─────────────────────────────────────────────
+// ── Bus rotation ────────────────────────────────────────────
 function updateBusRotation(heading) {
   if (!busMarker) return;
   if (!heading || heading === 0) return;
@@ -329,7 +329,7 @@ window.selectBus = function () {
     if (!busMarker) {
      busMarker = L.marker([data.lat, data.lng], {
        icon: L.divIcon({
-         html:      `<div style="font-size:26px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">🚌</div>`,
+         html: `<div style="font-size:26px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3));transform:scaleX(-1);">🚌</div>`,
          className: '',
          iconSize:  [26, 26],
          iconAnchor:[13, 13],
