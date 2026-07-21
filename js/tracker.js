@@ -89,18 +89,32 @@ function plotRouteStops(busKey) {
 }
 
 // ── Bus rotation ────────────────────────────────────────────
-function updateBusRotation(heading) {
-  if (!busMarker) return;
-  if (!heading || heading === 0) return;
-  const el = busMarker.getElement();
-  if (el) {
-    const div = el.querySelector('div');
-    if (div) {
-      div.style.transform      = `rotate(${heading}deg)`;
-      div.style.transformOrigin = '13px 13px';
-      div.style.display         = 'inline-block';
-    }
-  }
+// ── Bus icon with rotation ───────────────────────────────────
+function updateBusIcon(heading) {
+  const rotation = heading || 0;
+  return L.divIcon({
+    className: '',
+    html: `<div style="transform:rotate(${rotation}deg);transform-origin:center;">
+      <svg width="48" height="58" viewBox="0 0 48 58" xmlns="http://www.w3.org/2000/svg">
+        <path d="M24 0C13.5 0 5 8.5 5 19C5 33 24 58 24 58C24 58 43 33 43 19C43 8.5 34.5 0 24 0Z"
+              fill="#dc2626" stroke="white" stroke-width="1.5"/>
+        <circle cx="24" cy="19" r="13" fill="white"/>
+        <g transform="translate(10,10) scale(0.58)">
+          <rect x="2" y="6" width="34" height="20" rx="3" fill="#1a73e8"/>
+          <rect x="5" y="9" width="7" height="7" rx="1" fill="white"/>
+          <rect x="15" y="9" width="7" height="7" rx="1" fill="white"/>
+          <rect x="25" y="9" width="7" height="7" rx="1" fill="white"/>
+          <rect x="25" y="17" width="7" height="9" rx="1" fill="white"/>
+          <circle cx="9" cy="27" r="4" fill="#333"/>
+          <circle cx="9" cy="27" r="2" fill="#999"/>
+          <circle cx="29" cy="27" r="4" fill="#333"/>
+          <circle cx="29" cy="27" r="2" fill="#999"/>
+        </g>
+      </svg>
+    </div>`,
+    iconSize:    [48, 58],
+    iconAnchor:  [24, 58],
+  });
 }
 
 // ── Queue-based smooth animation ─────────────────────────────
