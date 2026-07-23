@@ -20,11 +20,11 @@ setInterval(() => {
 // ── Keep GPS alive ───────────────────────────────────────────
 setInterval(() => {
   if (isTracking && !watchId) {
-    startTracking();
+    startWatching();
   }
-}, 5000);
+}, 3000);
 
-// ── Shift change → populate bus dropdown ─────────────────────
+// ── Shift change ─────────────────────────────────────────────
 function onTripChange() {
   selTrip = document.getElementById('tripSelect').value;
   selBus  = '';
@@ -47,7 +47,7 @@ function onTripChange() {
   document.getElementById('shareLink').innerText = 'Select a bus to generate link';
 }
 
-// ── Bus change → show route list + share link ────────────────
+// ── Bus change ───────────────────────────────────────────────
 function onBusChange() {
   selBus = document.getElementById('busSelect').value;
   if (!selBus || !selTrip) return;
@@ -67,7 +67,7 @@ function onBusChange() {
     `${window.location.origin}/index.html?bus=${selBus}`;
 }
 
-// ── Toggle GPS tracking ──────────────────────────────────────
+// ── Toggle tracking ──────────────────────────────────────────
 function toggleTracking() {
   if (!selBus)  { alert('Please select your bus first!');   return; }
   if (!selTrip) { alert('Please select your shift first!'); return; }
@@ -76,25 +76,32 @@ function toggleTracking() {
 
 // ── Wake Lock ────────────────────────────────────────────────
 let wakeLock = null;
+
 async function requestWakeLock() {
   try {
+    if (wakeLock) return;
     wakeLock = await navigator.wakeLock.request('screen');
-    wakeLock.addEventListener('release', () => {
-      requestWakeLock();
+    wakeLock.addEventListener('release', async () => {
+      wakeLock = null;
+      if (isTracking) await requestWakeLock();
     });
   } catch (err) {
-    console.log('Wake lock failed:', err);
+    console.log('WakeLock error:', err);
   }
 }
 
 document.addEventListener('visibilitychange', async () => {
-  if (document.visibilityState === 'visible') {
+  if (document.visibilityState === 'visible' && isTracking) {
     await requestWakeLock();
+    if (!watchId) startWatching();
   }
 });
 
 window.addEventListener('focus', async () => {
-  await requestWakeLock();
+  if (isTracking) {
+    await requestWakeLock();
+    if (!watchId) startWatching();
+  }
 });
 
 // ── GPS Smoothing ─────────────────────────────────────────────
@@ -106,41 +113,31 @@ function getSmoothedLocation(lat, lng) {
   return { lat: smoothLat, lng: smoothLng };
 }
 
-// ── Start sharing GPS ────────────────────────────────────────
-function startTracking() {
-  isTracking = true;
-  gpsBuffer  = [];
-
-  document.getElementById('bigCircle').classList.add('live');
-  document.getElementById('ctext').innerText  = 'SHARING LIVE';
-  document.getElementById('badge').classList.add('live');
-  document.getElementById('bdot').classList.add('live');
-  document.getElementById('btext').innerText  = 'Location LIVE';
-
-  requestWakeLock();
-
-  db.ref('liveLocation/' + selBus).onDisconnect().remove();
+// ── GPS Watcher (restartable) ────────────────────────────────
+function startWatching() {
+  if (watchId) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
 
   watchId = navigator.geolocation.watchPosition(
     pos => {
       const { latitude: rawLat, longitude: rawLng, heading, speed, accuracy } = pos.coords;
 
-      // Show accuracy — never block GPS
       if (accuracy > 100) {
         document.getElementById('gpsVal').innerText =
-          '⚠️ GPS: ' + Math.round(accuracy) + 'm — Move outdoors for better accuracy';
+          '⚠️ GPS: ' + Math.round(accuracy) + 'm — Move outdoors';
       } else {
         document.getElementById('gpsVal').innerText =
-          '✅ GPS: ' + Math.round(accuracy) + 'm — ' + rawLat.toFixed(5) + ', ' + rawLng.toFixed(5);
+          '✅ GPS: ' + Math.round(accuracy) + 'm — ' +
+          rawLat.toFixed(5) + ', ' + rawLng.toFixed(5);
       }
 
       gpsCount++;
       document.getElementById('gpsCount').innerText = gpsCount;
 
-      // Smooth GPS readings
       const { lat, lng } = getSmoothedLocation(rawLat, rawLng);
 
-      // Calculate which stop has been passed
       const stops = ROUTE_STOPS[selBus] || [];
       let passedIndex = 0;
       stops.forEach((stopName, i) => {
@@ -150,10 +147,8 @@ function startTracking() {
         if (dist < 0.3) passedIndex = i + 1;
       });
 
-      // Update driver panel stop progress
       updateStopProgress(passedIndex);
 
-      // Send to Firebase
       db.ref('liveLocation/' + selBus).set({
         lat,
         lng,
@@ -161,18 +156,36 @@ function startTracking() {
         speed:     speed     || 0,
         accuracy:  accuracy,
         trip:      selTrip,
-        stopIndex: passedIndex,
         updatedAt: Date.now(),
       });
     },
     err => {
       document.getElementById('gpsVal').innerText = 'GPS Error: ' + err.message;
+      watchId = null;
     },
     { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
   );
 }
 
-// ── Stop sharing GPS ─────────────────────────────────────────
+// ── Start tracking ───────────────────────────────────────────
+function startTracking() {
+  isTracking = true;
+  gpsBuffer  = [];
+  gpsCount   = 0;
+
+  document.getElementById('bigCircle').classList.add('live');
+  document.getElementById('ctext').innerText    = 'SHARING LIVE';
+  document.getElementById('badge').classList.add('live');
+  document.getElementById('bdot').classList.add('live');
+  document.getElementById('btext').innerText    = 'Location LIVE';
+  document.getElementById('gpsCount').innerText = '0';
+
+  requestWakeLock();
+  db.ref('liveLocation/' + selBus).onDisconnect().remove();
+  startWatching();
+}
+
+// ── Stop tracking ────────────────────────────────────────────
 function stopTracking() {
   isTracking = false;
   gpsBuffer  = [];
@@ -182,16 +195,21 @@ function stopTracking() {
     watchId = null;
   }
 
+  if (wakeLock) {
+    wakeLock.release();
+    wakeLock = null;
+  }
+
   db.ref('liveLocation/' + selBus).remove();
 
   document.getElementById('bigCircle').classList.remove('live');
-  document.getElementById('ctext').innerText   = 'TAP TO SHARE';
+  document.getElementById('ctext').innerText    = 'TAP TO SHARE';
   document.getElementById('badge').classList.remove('live');
   document.getElementById('bdot').classList.remove('live');
-  document.getElementById('btext').innerText   = 'Location OFF';
-  document.getElementById('gpsVal').innerText  = 'Not sharing';
-  gpsCount = 0;
+  document.getElementById('btext').innerText    = 'Location OFF';
+  document.getElementById('gpsVal').innerText   = 'Not sharing';
   document.getElementById('gpsCount').innerText = '0';
+  gpsCount = 0;
 }
 
 // ── Update stop progress ─────────────────────────────────────
