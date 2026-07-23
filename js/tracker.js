@@ -216,19 +216,6 @@ async function processRoadETA(driverLat, driverLng) {
     const activeStops = ROUTE_STOPS[currentBusKey] || [];
     if (activeStops.length === 0) return;
 
-    // ── Advance stop ONLY when bus is within 150m of current stop ──
-    const currentStopName  = activeStops[routeStopIndex];
-    const currentStopCoord = STOP_COORDS[currentStopName];
-    if (currentStopCoord) {
-      const distToCurrentStop = getDistance(
-        driverLat, driverLng,
-        currentStopCoord.lat, currentStopCoord.lng
-      );
-      if (distToCurrentStop < 0.15 && routeStopIndex < activeStops.length - 1) {
-        routeStopIndex++;
-      }
-    }
-
     const destName  = activeStops[routeStopIndex];
     if (!destName) return;
     const destCoord = STOP_COORDS[destName] || CAMPUS_LOCATION;
@@ -310,8 +297,8 @@ window.selectBus = function () {
 
   if (busMarker) map.removeLayer(busMarker);
   busMarker = null;
-
-  dbListenerRef = db.ref('liveLocation/' + busKey).on('value', snap => {
+};
+dbListenerRef = db.ref('liveLocation/' + busKey).on('value', snap => {
     const data = snap.val();
 
     if (data && data.updatedAt) {
@@ -358,9 +345,35 @@ window.selectBus = function () {
     document.getElementById('info').innerText        = '🟢 Link Connection Active';
     document.getElementById('etaCard').style.display = 'block';
 
+    // ── Calculate correct next stop ──────────────────────────
+    calculateNextStop(data.lat, data.lng, busKey);
+    // ── Calculate correct next stop ──────────────────────────────
+function calculateNextStop(busLat, busLng, busKey) {
+  const stops = ROUTE_STOPS[busKey] || [];
+  if (stops.length === 0) return;
+
+  // Find the closest UPCOMING stop
+  // Start from current routeStopIndex and find next uncrossed stop
+  for (let i = routeStopIndex; i < stops.length; i++) {
+    const stopName  = stops[i];
+    const stopCoord = STOP_COORDS[stopName];
+    if (!stopCoord) continue;
+
+    const dist = getDistance(busLat, busLng, stopCoord.lat, stopCoord.lng);
+
+    // If bus has passed this stop (within 150m) move to next
+    if (dist < 0.15 && i < stops.length - 1) {
+      routeStopIndex = i + 1;
+    } else {
+      // This is the next upcoming stop — stop here
+      routeStopIndex = i;
+      break;
+    }
+  }
+}
+
     processRoadETA(data.lat, data.lng);
   });
-};
 
 // ── Topbar toggle ────────────────────────────────────────────
 window.toggleTopbar = function () {
