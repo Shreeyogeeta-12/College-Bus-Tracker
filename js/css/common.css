@@ -1,0 +1,23 @@
+/* ============================================================
+   common.css — Shared base styles for KLS GIT Bus Tracker
+   Used by: index.html (tracker) + driver.html (driver panel)
+   ============================================================ */
+
+/* Reset */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Base */
+html, body {
+  height: 100%;
+  font-family: 'Outfit', sans-serif;
+}
+
+/* Live dot blink animation — used by tracker topbar */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .3; }
+}

@@ -1,0 +1,144 @@
+/* ============================================================
+   tracker.css — Student-facing map view styles
+   ============================================================ */
+
+body { overflow: hidden; background: #f4f6f9; }
+
+#map { height: 100vh; width: 100%; }
+
+/* ── Top panel ─────────────────────────────────────────────── */
+#topbar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 340px;
+  background: white;
+  z-index: 1000;
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  border: 1px solid rgba(0,0,0,0.05);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#topbar.collapsed {
+  transform: translateX(-50%) translateY(-78%);
+}
+
+#togglePanelBtn {
+  position: absolute;
+  bottom: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  z-index: 2000;
+  color: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Branding ───────────────────────────────────────────────── */
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #f2f2f2;
+}
+.topbar-brand .logo { font-size: 18px; }
+.topbar-brand h1 { font-size: 12px; font-weight: 800; color: #111; letter-spacing: -0.2px; }
+.topbar-brand p  { font-size: 9px; color: #888; }
+
+.live-pill {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 100px;
+  padding: 2px 8px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #16a34a;
+}
+.live-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #16a34a;
+  animation: blink 1.2s ease-in-out infinite;
+}
+
+/* ── Dropdowns ──────────────────────────────────────────────── */
+.dropdown-style {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 11px;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1.5px solid #e5e7eb;
+  background: #fafafa;
+  color: #111;
+  margin-bottom: 6px;
+  outline: none;
+}
+
+/* ── Info text ──────────────────────────────────────────────── */
+#info       { font-size: 11px; font-weight: 600; color: #222; }
+#driverInfo { font-size: 10px; color: #666; margin-top: 1px; }
+
+/* ── ETA card ───────────────────────────────────────────────── */
+#etaCard {
+  position: absolute;
+  bottom: 16px;
+  right: 50%;
+  transform: translateX(50%);
+  width: 260px;
+  z-index: 1000;
+  background: white;
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.12);
+  display: none;
+  border: 1px solid rgba(0,0,0,0.05);
+}
+.eta-label       { font-size: 8px; color: #666; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+.eta-time        { font-size: 30px; font-weight: 800; color: #1a73e8; line-height: 1; }
+.eta-unit        { font-size: 12px; font-weight: 700; color: #1a73e8; margin-left: 2px; }
+.eta-destination { font-size: 12px; color: #111; font-weight: 700; margin-top: 4px; }
+.eta-dist        { font-size: 11px; color: #f97316; font-weight: 600; }
+
+/* ── Map stop labels ────────────────────────────────────────── */
+.google-stop-label {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.stop-text-pill {
+  background: rgba(255,255,255,0.95);
+  border: 1px solid rgba(26,115,232,0.3);
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-family: 'Outfit', sans-serif !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  color: #1a73e8 !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  white-space: nowrap;
+  display: inline-block;
+  transform: translateY(6px);
+}
