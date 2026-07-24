@@ -120,7 +120,7 @@ const STOP_COORDS = {
   "Yamanapur":                { lat: 15.9080,            lng: 74.5298            },
   "Visha Dhaba":              { lat: 15.9157,            lng: 74.5242            },
   "Nexa showroom":            { lat: 15.9016,            lng: 74.5097            },
-  "Basavana temple":          { lat: 15.9388   ,         lng: 74.5262            },
+  "Basavana temple":          { lat: 15.9388,            lng: 74.5262            },
   "Khanapur":                 { lat: 15.6394,            lng: 74.5185            },
   "BCM Hostel":               { lat: 15.7915,            lng: 74.4421            },
   "Machhe":                   { lat: 15.7952,            lng: 74.4485            },
