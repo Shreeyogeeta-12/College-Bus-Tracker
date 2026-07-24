@@ -88,8 +88,8 @@ function plotRouteStops(busKey) {
   });
 }
 
-// ── Bus icon with rotation ───────────────────────────────────
-function updateBusIcon(heading) {
+// ── Bus icon ─────────────────────────────────────────────────
+function updateBusIcon() {
   return L.divIcon({
     className: '',
     html: `<div style="font-size:30px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4));">🚌</div>`,
@@ -121,10 +121,7 @@ function processQueue() {
 
   if (!from) {
     lastPoint = to;
-    if (busMarker) {
-      busMarker.setLatLng([to.lat, to.lng]);
-      busMarker.setIcon(updateBusIcon(to.heading));
-    }
+    if (busMarker) busMarker.setLatLng([to.lat, to.lng]);
     processQueue();
     return;
   }
@@ -135,10 +132,7 @@ function processQueue() {
   const dist = getDistance(from.lat, from.lng, to.lat, to.lng);
   if (dist > 0.5) {
     lastPoint = to;
-    if (busMarker) {
-      busMarker.setLatLng([to.lat, to.lng]);
-      busMarker.setIcon(updateBusIcon(to.heading));
-    }
+    if (busMarker) busMarker.setLatLng([to.lat, to.lng]);
     processQueue();
     return;
   }
@@ -166,7 +160,6 @@ function processQueue() {
       requestAnimationFrame(animate);
     } else {
       lastPoint = to;
-      if (busMarker) busMarker.setIcon(updateBusIcon(to.heading));
       processQueue();
     }
   }
@@ -207,6 +200,27 @@ function stopPrediction() {
   if (predictionId) {
     cancelAnimationFrame(predictionId);
     predictionId = null;
+  }
+}
+
+// ── Calculate correct next stop ──────────────────────────────
+function calculateNextStop(busLat, busLng, busKey) {
+  const stops = ROUTE_STOPS[busKey] || [];
+  if (stops.length === 0) return;
+
+  for (let i = routeStopIndex; i < stops.length; i++) {
+    const stopName  = stops[i];
+    const stopCoord = STOP_COORDS[stopName];
+    if (!stopCoord) continue;
+
+    const dist = getDistance(busLat, busLng, stopCoord.lat, stopCoord.lng);
+
+    if (dist < 0.15 && i < stops.length - 1) {
+      routeStopIndex = i + 1;
+    } else {
+      routeStopIndex = i;
+      break;
+    }
   }
 }
 
@@ -297,8 +311,8 @@ window.selectBus = function () {
 
   if (busMarker) map.removeLayer(busMarker);
   busMarker = null;
-};
-dbListenerRef = db.ref('liveLocation/' + busKey).on('value', snap => {
+
+  dbListenerRef = db.ref('liveLocation/' + busKey).on('value', snap => {
     const data = snap.val();
 
     if (data && data.updatedAt) {
@@ -322,7 +336,7 @@ dbListenerRef = db.ref('liveLocation/' + busKey).on('value', snap => {
 
     if (!busMarker) {
       busMarker = L.marker([data.lat, data.lng], {
-        icon:         updateBusIcon(data.heading || 0),
+        icon:         updateBusIcon(),
         zIndexOffset: 1000,
       }).addTo(map);
       map.setView([data.lat, data.lng], 15);
@@ -333,6 +347,8 @@ dbListenerRef = db.ref('liveLocation/' + busKey).on('value', snap => {
       speedHistory.push(rawSpeed);
       if (speedHistory.length > SPEED_BUFFER_SIZE) speedHistory.shift();
     }
+
+    calculateNextStop(data.lat, data.lng, busKey);
 
     enqueuePoint({
       lat:       data.lat,
@@ -345,35 +361,9 @@ dbListenerRef = db.ref('liveLocation/' + busKey).on('value', snap => {
     document.getElementById('info').innerText        = '🟢 Link Connection Active';
     document.getElementById('etaCard').style.display = 'block';
 
-    // ── Calculate correct next stop ──────────────────────────
-    calculateNextStop(data.lat, data.lng, busKey);
-    // ── Calculate correct next stop ──────────────────────────────
-function calculateNextStop(busLat, busLng, busKey) {
-  const stops = ROUTE_STOPS[busKey] || [];
-  if (stops.length === 0) return;
-
-  // Find the closest UPCOMING stop
-  // Start from current routeStopIndex and find next uncrossed stop
-  for (let i = routeStopIndex; i < stops.length; i++) {
-    const stopName  = stops[i];
-    const stopCoord = STOP_COORDS[stopName];
-    if (!stopCoord) continue;
-
-    const dist = getDistance(busLat, busLng, stopCoord.lat, stopCoord.lng);
-
-    // If bus has passed this stop (within 150m) move to next
-    if (dist < 0.15 && i < stops.length - 1) {
-      routeStopIndex = i + 1;
-    } else {
-      // This is the next upcoming stop — stop here
-      routeStopIndex = i;
-      break;
-    }
-  }
-}
-
     processRoadETA(data.lat, data.lng);
   });
+};
 
 // ── Topbar toggle ────────────────────────────────────────────
 window.toggleTopbar = function () {
