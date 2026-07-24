@@ -16,8 +16,12 @@ const STOP_COORDS = {
   "Bogarves":                 { lat: 15.859392831086069, lng: 74.50804352220592 },
   "RTO":                      { lat: 15.866162146121916, lng: 74.51920953747813 },
   "Fort lake":                { lat: 15.863277670308042, lng: 74.52515759286305 },
-  "Fort Circle":              { lat: 15.8578,            lng: 74.5265            },
+  "Fort Circle":              { lat: 15.8578,            lng: 74.5265           },
   "Fish Market":              { lat: 15.852919171544498, lng: 74.50622700152316 },
+  "Gogate Circle":            { lat: 15.8512           , lng: 74.5072                  },
+  "1st Gate":                 { lat: 15.8374           , lng: 74.5015               }, 
+  "2nd Gate":                 { lat: 15.8327           , lng: 74.4981                 },
+  "3rd Gate":                 { lat: 15.8274           , lng: 74.4965              },
 
   // ── Ramtheerth Nagar / Kanbargi area ────────────────────────
   "Surabhi Hotel":            { lat: 15.879310572925196, lng: 74.54071920363943 },
@@ -116,7 +120,7 @@ const STOP_COORDS = {
   "Yamanapur":                { lat: 15.9080,            lng: 74.5298            },
   "Visha Dhaba":              { lat: 15.9157,            lng: 74.5242            },
   "Nexa showroom":            { lat: 15.9016,            lng: 74.5097            },
-  "Basavana temple":          { lat: 15.   ,             lng: 74.                },
+  "Basavana temple":          { lat: 15.9388   ,         lng: 74.5262            },
   "Khanapur":                 { lat: 15.6394,            lng: 74.5185            },
   "BCM Hostel":               { lat: 15.7915,            lng: 74.4421            },
   "Machhe":                   { lat: 15.7952,            lng: 74.4485            },
@@ -124,7 +128,16 @@ const STOP_COORDS = {
   "Sulaga":                   { lat: 15.9378,            lng: 74.5447            },
   "Uchagaon cross":           { lat: 15.8928,            lng: 74.4754            },
   "Kranti nagar":             { lat: 15.8943,            lng: 74.4988            },
-
+  "Khanapur Old Bus Stop":    { lat: 15.6384,            lng: 74.5165            },
+  "Khanapur New Bus Stop":    { lat: 15.6412,            lng: 74.5173            },
+  "Jamboti Cross":            { lat: 15.6416,            lng: 74.516             },
+  "Court":                    { lat: 15.6329,            lng: 74.5126            },
+  "Idalonda":                 { lat: 15.6669,            lng: 74.5298            },
+  "Prabhu Nagar":             { lat: 15.6139,            lng: 74.5268            },
+  "Desur":                    { lat: 15.7592,            lng: 74.4913            },
+  "Phirwadi Naka":            { lat: 15.8239,            lng: 74.4758            },
+  "Brahma Nagar":             { lat: 15.8252,            lng: 74.4754            },
+  "Jitu Hostel":              { lat: 15.8306,            lng: 74.4920            },
 
 
 };
