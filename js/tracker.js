@@ -100,6 +100,12 @@ function updateBusIcon() {
 
 // ── Queue-based smooth animation ─────────────────────────────
 function enqueuePoint(point) {
+  // Ignore if bus moved backwards more than 50m
+  if (lastPoint) {
+    const dist = getDistance(lastPoint.lat, lastPoint.lng, point.lat, point.lng);
+    // If moved more than 200m in one update — likely GPS jump, skip
+    if (dist > 0.2 && point.speed < 5) return;
+  }
   gpsQueue.push(point);
   if (!isAnimating) processQueue();
 }
@@ -224,6 +230,27 @@ function calculateNextStop(busLat, busLng, busKey) {
   }
 }
 
+// ── Snap to road using Ola Maps ──────────────────────────────
+async function snapToRoad(lat, lng) {
+  try {
+    const response = await fetch(
+      `https://api.olamaps.io/routing/v1/snapToRoads` +
+      `?points=${lat},${lng}` +
+      `&api_key=${OLA_MAPS_API_KEY}`,
+      { method: 'POST' }
+    );
+    const json = await response.json();
+    if (json.snapped_points && json.snapped_points.length > 0) {
+      return {
+        lat: json.snapped_points[0].location.latitude,
+        lng: json.snapped_points[0].location.longitude,
+      };
+    }
+  } catch (err) {
+    console.log('Snap to road failed:', err);
+  }
+  return { lat, lng };
+}
 // ── ETA calculation ──────────────────────────────────────────
 async function processRoadETA(driverLat, driverLng) {
   try {
@@ -350,12 +377,15 @@ window.selectBus = function () {
 
     calculateNextStop(data.lat, data.lng, busKey);
 
-    enqueuePoint({
-      lat:       data.lat,
-      lng:       data.lng,
-      speed:     data.speed   || 0,
-      heading:   data.heading || 0,
-      updatedAt: data.updatedAt || Date.now(),
+    // Snap to road for accurate position
+    snapToRoad(data.lat, data.lng).then(snapped => {
+      enqueuePoint({
+        lat:       snapped.lat,
+        lng:       snapped.lng,
+        speed:     data.speed   || 0,
+        heading:   data.heading || 0,
+        updatedAt: data.updatedAt || Date.now(),
+      });
     });
 
     document.getElementById('info').innerText        = '🟢 Link Connection Active';
