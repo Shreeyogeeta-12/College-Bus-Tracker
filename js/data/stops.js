@@ -12,48 +12,38 @@ const STOP_COORDS = {
   // ── City centre / CBT area ──────────────────────────────────
   "CBT":                      { lat: 15.862597703480448, lng: 74.52135239334002 },
   "Channamma Circle":         { lat: 15.867239677878619, lng: 74.5116872942316  },
-  "Channamma circle":         { lat: 15.867239677878619, lng: 74.5116872942316  },
   "Bogarves":                 { lat: 15.859392831086069, lng: 74.50804352220592 },
   "RTO":                      { lat: 15.866162146121916, lng: 74.51920953747813 },
   "Fort lake":                { lat: 15.863277670308042, lng: 74.52515759286305 },
   "Fort Circle":              { lat: 15.8578,            lng: 74.5265           },
   "Fish Market":              { lat: 15.852919171544498, lng: 74.50622700152316 },
-  "Gogate Circle":            { lat: 15.8512           , lng: 74.5072                  },
-  "1st Gate":                 { lat: 15.8374           , lng: 74.5015               }, 
-  "2nd Gate":                 { lat: 15.8327           , lng: 74.4981                 },
-  "3rd Gate":                 { lat: 15.8274           , lng: 74.4965              },
+  "Gogte Circle":             { lat: 15.8512           , lng: 74.5072           },
+  "1st Gate":                 { lat: 15.8374           , lng: 74.5015           }, 
+  "2nd Gate":                 { lat: 15.8327           , lng: 74.4981           },
+  "3rd Gate":                 { lat: 15.8274           , lng: 74.4965           },
 
   // ── Ramtheerth Nagar / Kanbargi area ────────────────────────
   "Surabhi Hotel":            { lat: 15.879310572925196, lng: 74.54071920363943 },
   "LSA School":               { lat: 15.882715046210498, lng: 74.54435240405182 },
   "Kanbargi":                 { lat: 15.891702743041684, lng: 74.55608644028787 },
-  "KPTCL":                    { lat: 15.883341886972437, lng: 74.5225009785071  },
   "Ganesh Circle":            { lat: 15.889504428235583, lng: 74.54884420231672 },
-  "Ganesh circle":            { lat: 15.889504428235583, lng: 74.54884420231672 },
   "Uday School Stop 0":       { lat: 15.889430031590685, lng: 74.54728287540544 },
   "Uday school stop 1":       { lat: 15.888658144504205, lng: 74.54551317015296 },
   "Uday school":              { lat: 15.889618808076461, lng: 74.54548446923341 },
   "KSCA CRICKET STADIUM":     { lat: 15.886899193938705, lng: 74.54513625075737 },
-  "Harsha hotel":             { lat: 15.887393551711304, lng: 74.54183239725833 },
-  "Harsha Hotel":             { lat: 15.887393551711304, lng: 74.54183239725833 },
   "Harsha hotel ":            { lat: 15.887393551711304, lng: 74.54183239725833 },
   "Janata plot":              { lat: 15.885793559614829, lng: 74.53787674914886 },
-  "Sai mandir":               { lat: 15.88180173133962,  lng: 74.53253209646233 },
   "Sai mandir ":              { lat: 15.88180173133962,  lng: 74.53253209646233 },
   "Shrinagar garden":         { lat: 15.880628133488766, lng: 74.5295568729132  },
   "Ramtheerth Nagar":         { lat: 15.887393551711304, lng: 74.54183239725833 }, // approx Harsha Hotel area
 
   // ── Mahantesh Nagar / Sidnal area ───────────────────────────
-  "Nandini Dairy":            { lat: 15.8698,            lng: 74.5342            },
   "Nandini dairy":            { lat: 15.8698,            lng: 74.5342            },
-  "Sidnal Stop":              { lat: 15.875980875387944, lng: 74.53346818447068 },
   "Sidnal stop":              { lat: 15.875980875387944, lng: 74.53346818447068 },
   "More Store":               { lat: 15.877482007161944, lng: 74.51483555995031 },
-  "More stop":                { lat: 15.877482007161944, lng: 74.51483555995031 },
   "Mahantesh Nagar 1st Stop": { lat: 15.8741,            lng: 74.5391            },
   "Mahantesh Nagar":          { lat: 15.8741,            lng: 74.5391            },
-  "Azam Nagar":               { lat: 15.8752,            lng: 74.5242            },
-  "Gandhi Nagar":             { lat: 15.8535,            lng: 74.5342            },
+  
 
   // ── SGBIT / Ramdev area ─────────────────────────────────────
   "SGBIT":                    { lat: 15.880756552550618, lng: 74.51930605282095 },
@@ -62,12 +52,10 @@ const STOP_COORDS = {
 
   // ── Hanuman Nagar / Sadashiv Nagar area ─────────────────────
   "Hindalga Ganesh Temple":   { lat: 15.868964004747033, lng: 74.48942158165639 },
-  "Hindalga jail":            { lat: 15.8974           , lng: 74.4795           },
-  "Ganesh Temple":            { lat: 15.868964004747033, lng: 74.48942158165639 },
   "Kuvempu Nagar":            { lat: 15.874813628415831, lng: 74.4914875069715  },
   "KLE School":               { lat: 15.879464938336959, lng: 74.4849004606231  },
   "Sahaydri Nagar":           { lat: 15.88140981084143,  lng: 74.4854294948751  },
-  "Kumarswami Layout":        { lat: 15.882894216407953, lng: 74.4914412919549  },
+  "Kumarswamy Layout":        { lat: 15.882894216407953, lng: 74.4914412919549  },
   "Hanuman Nagar 2nd Stop":   { lat: 15.880412109390043, lng: 74.49287119936872 },
   "Hanuman Nagar Circle":     { lat: 15.88020935614367,  lng: 74.49658544912198 },
   "Hanuman Nagar":            { lat: 15.88020935614367,  lng: 74.49658544912198 },
@@ -77,17 +65,21 @@ const STOP_COORDS = {
   "Sadashiv Nagar":           { lat: 15.87436655611429,  lng: 74.5079470939882  },
   "Sadashiv nagar last stop": { lat: 15.8767          ,  lng: 74.5093           },
   "Rail Nagar":               { lat: 15.8675          ,  lng: 74.5312           },
-  "NCC Ground":               { lat: 15.873169        ,  lng: 74.5225},
-  "TV Centre":                { lat: 15.876,             lng: 74.502             }, // approx Sadashiv Nagar area
+  "NCC Ground":               { lat: 15.873169        ,  lng: 74.5225           },
   "Shri nagar stop":          { lat: 15.880628133488766, lng: 74.5295568729132  }, // approx Shrinagar garden
   "Shrinagar":                { lat: 15.880628133488766, lng: 74.5295568729132  },
 
   // ── Ganeshpur / Indal Colony area ───────────────────────────
   "Ganeshpur":                { lat: 15.8895,            lng: 74.4998            },
-  "Pipeline":                 { lat: 15.8941,            lng: 74.5028            },
-  "Indal Colony":             { lat: 15.8955,            lng: 74.5212            },
-  "Indal bridge":             { lat: 15.8903,            lng: 74.5244            },
-  
+  "Pipeline":                 { lat: 15.8639951,         lng: 74.4851432         },
+  "Indal Colony":             { lat: 15.9029608,         lng: 74.5250889         },
+  "Ganapati Temple":          { lat: 15.890695,          lng: 74.484213          },
+  "Vijayanagar 2nd Stop":     { lat: 15.8856641,         lng: 74.4925763         },
+  "Hindalga Jail":            { lat: 15.8913,            lng: 74.4735            },
+  "Sulaga":                   { lat: 15.8778929,         lng: 74.4533757         },
+  "Uchagoan Cross":           { lat: 15.8814,            lng: 74.4319            },
+  "Kranti nagar":             { lat: 15.8943,            lng: 74.4988            },
+  "Vinayak Nagar":            { lat: 15.8646194,         lng: 74.498877          },
 
   // ── Vadagaon / Goa Ves area ─────────────────────────────────
   "Congress Road":            { lat: 15.8368,            lng: 74.5008            },
@@ -104,7 +96,7 @@ const STOP_COORDS = {
 
   // ── Other areas ─────────────────────────────────────────────
   "KLE Engg College":         { lat: 15.818341735130394, lng: 74.49274331694994 },
-  "Marihal":                  { lat: 15.8821,            lng: 74.6294            },
+  "Marihal":                  { lat: 15.8814,            lng: 74.6692            },
   "Sambra":                   { lat: 15.8524,            lng: 74.6148            },
   "RC Nagar":                 { lat: 15.8385,            lng: 74.4912            },
   "Mandoli Road":             { lat: 15.8315,            lng: 74.4795            },
@@ -135,9 +127,20 @@ const STOP_COORDS = {
   "Idalonda":                 { lat: 15.6669,            lng: 74.5298            },
   "Prabhu Nagar":             { lat: 15.6139,            lng: 74.5268            },
   "Desur":                    { lat: 15.7592,            lng: 74.4913            },
-  "Phirwadi Naka":            { lat: 15.8239,            lng: 74.4758            },
+  "Piranwadi Naka":           { lat: 15.8239,            lng: 74.4758            },
   "Brahma Nagar":             { lat: 15.8252,            lng: 74.4754            },
   "Jitu Hostel":              { lat: 15.8306,            lng: 74.4920            },
-
+  "Modaga":                   { lat: 15.8678,            lng: 74.6808            },
+  "Anand Nagar":              { lat: 15.8285,            lng: 74.5052            },
+  "Pant Balekundari":         { lat: 15.8820,            lng: 74.6319            },
+  "Honnalli":                 { lat: 15.8450,            lng: 74.6323            },
+  "Balekundri":               { lat: 15.8714,            lng: 74.6192            },
+  "Sambra":                   { lat: 15.8800,            lng: 74.5600            },
+  "Mutaga":                   { lat: 15.8570,            lng: 74.5817            },
+  "Niliji":                   { lat: 15.8476,            lng: 74.5900            },
+  "Shindoli":                 { lat: 15.8607,            lng: 74.5781            },
+  "Basavan Kudachi":          { lat: 15.8585,            lng: 74.5719            },
+  "SC Motors":                { lat: 15.8665,            lng: 74.5298            },
+  "Gandhi Nagar":             { lat: 15.8629,            lng: 74.5338            },
 
 };
