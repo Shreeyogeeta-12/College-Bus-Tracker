@@ -214,17 +214,19 @@ function calculateNextStop(busLat, busLng, busKey) {
   const stops = ROUTE_STOPS[busKey] || [];
   if (stops.length === 0) return;
 
-  for (let i = routeStopIndex; i < stops.length; i++) {
+  // Only move forward — never go back
+  for (let i = routeStopIndex; i < stops.length - 1; i++) {
     const stopName  = stops[i];
     const stopCoord = STOP_COORDS[stopName];
     if (!stopCoord) continue;
 
     const dist = getDistance(busLat, busLng, stopCoord.lat, stopCoord.lng);
 
-    if (dist < 0.15 && i < stops.length - 1) {
+    // Bus passed this stop — advance to next
+    if (dist < 0.15) {
       routeStopIndex = i + 1;
     } else {
-      routeStopIndex = i;
+      // Not yet reached this stop — stay here
       break;
     }
   }
