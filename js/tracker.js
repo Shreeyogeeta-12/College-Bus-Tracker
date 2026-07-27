@@ -6,14 +6,33 @@
 let map, busMarker, dbListenerRef;
 let currentBusKey  = null;
 let speedHistory   = [];
-let routeStopIndex = 0;   // fallback-only; primary source is Firebase data.stopIndex
-let etaRequestId   = 0;   // guards against out-of-order async ETA responses
+let routeStopIndex = 0;
+let etaRequestId   = 0;
 
 // ── Constants ────────────────────────────────────────────────
 const STOP_ARRIVAL_RADIUS_KM = 0.3;
-const DEFAULT_SPEED_MS       = 6.94;   // 25 km/h fallback
+const DEFAULT_SPEED_MS       = 6.94;
 const MIN_VALID_SPEED_MS     = 0.5;
 const STOPPED_CONFIRM_COUNT  = 3;
+
+// ── Normalized stop-name lookup ──────────────────────────────
+// routes.js and stops.js don't always agree on exact capitalization or
+// whitespace ("Harsha hotel" vs "Harsha hotel ", "Channamma circle" vs
+// "Channamma Circle"). This normalizes both sides before comparing so
+// those mismatches don't silently break ETA. It does NOT fix genuine
+// spelling differences (e.g. "Chennamma" vs "Channamma") or stops
+// missing from stops.js entirely — those still need a data fix.
+const NORMALIZED_STOP_COORDS = {};
+Object.keys(STOP_COORDS).forEach(key => {
+  const normalized = key.trim().toLowerCase().replace(/\s+/g, ' ');
+  NORMALIZED_STOP_COORDS[normalized] = STOP_COORDS[key];
+});
+
+function getStopCoord(stopName) {
+  if (!stopName) return null;
+  const normalized = stopName.trim().toLowerCase().replace(/\s+/g, ' ');
+  return NORMALIZED_STOP_COORDS[normalized] || null;
+}
 
 // ── GPS Queue System ─────────────────────────────────────────
 const gpsQueue   = [];
@@ -78,9 +97,14 @@ function plotRouteStops(busKey) {
 
   routeMarkersGroup.clearLayers();
   const stopsList = ROUTE_STOPS[busKey] || [];
+  const missingStops = [];
+
   stopsList.forEach(stopName => {
-    const coords = STOP_COORDS[stopName];
-    if (!coords) return;
+    const coords = getStopCoord(stopName);
+    if (!coords) {
+      missingStops.push(stopName);
+      return;
+    }
     L.circleMarker([coords.lat, coords.lng], {
       radius: 6, color: '#ffffff', weight: 1.8, fillColor: '#1a73e8', fillOpacity: 1,
     }).addTo(routeMarkersGroup);
@@ -92,6 +116,10 @@ function plotRouteStops(busKey) {
       }),
     }).addTo(routeMarkersGroup);
   });
+
+  if (missingStops.length > 0) {
+    console.warn(`[Route ${busKey}] Missing coordinates for:`, missingStops);
+  }
 }
 
 // ── Bus icon ─────────────────────────────────────────────────
@@ -108,7 +136,7 @@ function updateBusIcon() {
 function enqueuePoint(point) {
   if (lastPoint) {
     const dist = getDistance(lastPoint.lat, lastPoint.lng, point.lat, point.lng);
-    if (dist > 0.2 && point.speed < 5) return; // likely GPS jump, skip
+    if (dist > 0.2 && point.speed < 5) return;
   }
   gpsQueue.push(point);
   if (!isAnimating) processQueue();
@@ -213,12 +241,7 @@ function stopPrediction() {
   }
 }
 
-// ── Snap to road (FIXED — reintegrated + defensive parsing) ──
-// Tries multiple known OLA Maps response shapes since the exact schema
-// hasn't been confirmed from a live response yet. If the bus STILL shows
-// off the road after this, uncomment the console.log below, open
-// DevTools console, and send the printed output — that pins down the
-// exact field names OLA is returning so this can be tightened further.
+// ── Snap to road ───────────────────────────────────────────────
 async function snapToRoad(lat, lng) {
   try {
     const response = await fetch(
@@ -228,9 +251,6 @@ async function snapToRoad(lat, lng) {
       { method: 'POST' }
     );
     const json = await response.json();
-
-    // console.log('SNAP TO ROAD RAW RESPONSE:', JSON.stringify(json));
-
     const points = json.snapped_points || json.snappedPoints;
     if (points && points.length > 0) {
       const p   = points[0];
@@ -244,19 +264,17 @@ async function snapToRoad(lat, lng) {
   } catch (err) {
     console.log('Snap to road failed:', err);
   }
-  return { lat, lng }; // fallback — raw GPS, unchanged
+  return { lat, lng };
 }
 
 // ── ETA color ──────────────────────────────────────────────────
 function getEtaColor(minutes) {
-  if (minutes < 5)  return '#dc2626'; // red
-  if (minutes < 10) return '#f59e0b'; // orange
-  return '#16a34a';                    // green
+  if (minutes < 5)  return '#dc2626';
+  if (minutes < 10) return '#f59e0b';
+  return '#16a34a';
 }
 
 // ── Resolve which stop index to use ──────────────────────────
-// stopIndex from Firebase = the driver app's CURRENT target stop
-// (not yet reached). No +1 here — confirmed against driver.js logic.
 function resolveStopIndex(busKey, data) {
   const stops = ROUTE_STOPS[busKey] || [];
   if (stops.length === 0) return 0;
@@ -266,10 +284,9 @@ function resolveStopIndex(busKey, data) {
     return routeStopIndex;
   }
 
-  // Fallback only if stopIndex is ever missing from Firebase
   if (routeStopIndex < stops.length - 1) {
     const targetName  = stops[routeStopIndex];
-    const targetCoord = STOP_COORDS[targetName];
+    const targetCoord = getStopCoord(targetName);
     if (targetCoord) {
       const dist = getDistance(data.lat, data.lng, targetCoord.lat, targetCoord.lng);
       if (dist < STOP_ARRIVAL_RADIUS_KM) routeStopIndex++;
@@ -280,19 +297,33 @@ function resolveStopIndex(busKey, data) {
 
 // ── ETA calculation ──────────────────────────────────────────
 async function processETA(busKey, data) {
-  const thisRequestId = ++etaRequestId; // sequencing guard
+  const thisRequestId = ++etaRequestId;
   try {
     const stops = ROUTE_STOPS[busKey] || [];
-    if (stops.length === 0) return;
 
-    const stopIndex     = resolveStopIndex(busKey, data);
-    const targetName    = stops[stopIndex];
-    const targetCoord   = STOP_COORDS[targetName];
-    if (!targetCoord) return;
+    if (stops.length === 0) {
+      document.getElementById('etaDestination').innerText =
+        `⚠️ No route found for busKey "${busKey}" — check ROUTE_STOPS in routes.js`;
+      document.getElementById('etaTime').innerText = '—';
+      document.getElementById('etaDist').innerText = '';
+      return;
+    }
+
+    const stopIndex   = resolveStopIndex(busKey, data);
+    const targetName  = stops[stopIndex];
+    const targetCoord = getStopCoord(targetName);
+
+    if (!targetCoord) {
+      document.getElementById('etaDestination').innerText =
+        `⚠️ Stop "${targetName}" has no match in stops.js — check spelling in routes.js or stops.js`;
+      document.getElementById('etaTime').innerText = '—';
+      document.getElementById('etaDist').innerText = '';
+      console.warn(`[ETA] Unresolved stop name: "${targetName}" (busKey: ${busKey}, index: ${stopIndex})`);
+      return;
+    }
 
     const haversineDistKm = getDistance(data.lat, data.lng, targetCoord.lat, targetCoord.lng);
 
-    // Final stop — check if actually arrived (within radius), not just "assigned"
     if (stopIndex >= stops.length - 1 && haversineDistKm < STOP_ARRIVAL_RADIUS_KM) {
       if (thisRequestId !== etaRequestId) return;
       document.getElementById('etaDestination').innerText = 'Arrived at destination';
@@ -329,7 +360,7 @@ async function processETA(busKey, data) {
           (typeof leg?.duration === 'number' ? leg.duration : 0);
 
         if (roadMeters > 0) {
-          distanceKm  = roadMeters / 1000;   // keep displayed km consistent with ETA source
+          distanceKm  = roadMeters / 1000;
           usedRoadApi = true;
           if (roadDur > 0) {
             const olaSpeedMs = roadMeters / roadDur;
@@ -346,7 +377,6 @@ async function processETA(busKey, data) {
       etaMinutes = Math.max(1, Math.round((distanceKm / speedKmh) * 60));
     }
 
-    // Stopped-bus streak tracking
     if (rawSpeed > 0 && rawSpeed < MIN_VALID_SPEED_MS) {
       speedHistory.push(rawSpeed);
       if (speedHistory.length > STOPPED_CONFIRM_COUNT) speedHistory.shift();
@@ -355,7 +385,7 @@ async function processETA(busKey, data) {
     }
     const isStopped = speedHistory.length >= STOPPED_CONFIRM_COUNT;
 
-    if (thisRequestId !== etaRequestId) return; // a newer update already landed — discard this one
+    if (thisRequestId !== etaRequestId) return;
 
     const etaEl = document.getElementById('etaTime');
     etaEl.innerText   = isStopped ? '~' + etaMinutes : String(etaMinutes);
@@ -367,6 +397,7 @@ async function processETA(busKey, data) {
       : `${distanceKm.toFixed(1)} km away${usedRoadApi ? '' : ' (straight-line)'}`;
 
   } catch (err) {
+    document.getElementById('etaDestination').innerText = `⚠️ ETA crashed: ${err.message}`;
     console.error('ETA error:', err);
   }
 }
@@ -426,8 +457,6 @@ window.selectBus = function () {
       map.setView([data.lat, data.lng], 15);
     }
 
-    // Snap to road BEFORE animating the marker — this is the fix for
-    // the bus rendering beside the road instead of centered on it.
     snapToRoad(data.lat, data.lng).then(snapped => {
       enqueuePoint({
         lat:       snapped.lat,
