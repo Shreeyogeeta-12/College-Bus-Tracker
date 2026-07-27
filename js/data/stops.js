@@ -159,6 +159,6 @@ const STOP_COORDS = {
   "Apoorva Hostipal":         { lat: 15.8486,            lng: 74.5167            },
   "Bhatkande School":         { lat: 15.8487,            lng: 74.5179            },
   "Tukaram Bank":             { lat: 15.8465,            lng: 74.5152            },
-  "Datt Mandir":              { lat: 15.8415             lng: 74.5191            },
+  "Datt Mandir":              { lat: 15.8415,            lng: 74.5191            },
     
 };
