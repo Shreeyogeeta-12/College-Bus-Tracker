@@ -69,7 +69,20 @@
   <script src="js/data/routes.js"></script>
   <script src="js/data/shifts.js"></script>
   <script src="js/data/drivers.js"></script>
-  <script src="js/config.js"></script>
+  <script>
+firebase.initializeApp({
+  databaseURL: "https://college-bus-tracker-11fce-default-rtdb.firebaseio.com"
+});
+const db = firebase.database();
+const CAMPUS_LOCATION = { lat: 15.8164, lng: 74.4835 };
+const BELAGAVI_BOUNDS = [[15.7800, 74.4000], [15.9000, 74.6000]];
+const OLA_MAPS_API_KEY = 's0OZq9XTSK6I8m2YxidijWQDa4JmxdgMCQvXglZo';
+const SHIFT_END_CLEANUP_HOURS = 1;
+const SPEED_BUFFER_SIZE = 10;
+const CITY_DEFAULT_SPEED_MS = 25 / 3.6;
+const ETA_TRAFFIC_BUFFER = 1.10;
+const DRIVER_DB = {};
+</script>
   <script src="js/utils.js"></script>
   <script src="js/tracker.js"></script>
 
