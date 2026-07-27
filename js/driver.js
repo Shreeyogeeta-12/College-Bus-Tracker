@@ -9,6 +9,9 @@ let gpsCount   = 0;
 let selBus     = '';
 let selTrip    = '';
 let gpsBuffer  = [];
+let routeStopIndex = 0;   // NEW — persistent, sequential, forward-only
+
+const STOP_ARRIVAL_RADIUS_KM = 0.3;
 
 // ── Clock ────────────────────────────────────────────────────
 setInterval(() => {
@@ -50,6 +53,7 @@ function onTripChange() {
 // ── Bus change ───────────────────────────────────────────────
 function onBusChange() {
   selBus = document.getElementById('busSelect').value;
+  routeStopIndex = 0;   // NEW — reset for the newly selected route
   if (!selBus || !selTrip) return;
 
   const stops = ROUTE_STOPS[selBus] || [];
@@ -113,6 +117,28 @@ function getSmoothedLocation(lat, lng) {
   return { lat: smoothLat, lng: smoothLng };
 }
 
+// ── Advance stop progress (FIXED — sequential, forward-only) ──
+// Only checks the CURRENT target stop, never re-scans the whole route.
+// This is what prevents the "immediately shows final stop" bug that
+// happened with routes looping back through the same KLS GIT coordinates.
+function advanceStopProgress(lat, lng) {
+  const stops = ROUTE_STOPS[selBus] || [];
+  if (stops.length === 0) return;
+
+  if (routeStopIndex < stops.length - 1) {
+    const targetName  = stops[routeStopIndex];
+    const targetCoord = STOP_COORDS[targetName];
+    if (targetCoord) {
+      const dist = getDistance(lat, lng, targetCoord.lat, targetCoord.lng);
+      if (dist < STOP_ARRIVAL_RADIUS_KM) {
+        routeStopIndex++;
+      }
+    }
+  }
+
+  updateStopProgress(routeStopIndex);
+}
+
 // ── GPS Watcher (restartable) ────────────────────────────────
 function startWatching() {
   if (watchId) {
@@ -138,16 +164,7 @@ function startWatching() {
 
       const { lat, lng } = getSmoothedLocation(rawLat, rawLng);
 
-      const stops = ROUTE_STOPS[selBus] || [];
-      let passedIndex = 0;
-      stops.forEach((stopName, i) => {
-        const coord = STOP_COORDS[stopName];
-        if (!coord) return;
-        const dist = getDistance(lat, lng, coord.lat, coord.lng);
-        if (dist < 0.3) passedIndex = i + 1;
-      });
-
-      updateStopProgress(passedIndex);
+      advanceStopProgress(lat, lng);   // FIXED — replaces the old forEach scan
 
       db.ref('liveLocation/' + selBus).set({
         lat,
@@ -156,6 +173,7 @@ function startWatching() {
         speed:     speed     || 0,
         accuracy:  accuracy,
         trip:      selTrip,
+        stopIndex: routeStopIndex,   // FIXED — this was missing entirely
         updatedAt: Date.now(),
       });
     },
@@ -172,6 +190,7 @@ function startTracking() {
   isTracking = true;
   gpsBuffer  = [];
   gpsCount   = 0;
+  routeStopIndex = 0;   // NEW — fresh start for this trip
 
   document.getElementById('bigCircle').classList.add('live');
   document.getElementById('ctext').innerText    = 'SHARING LIVE';
