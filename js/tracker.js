@@ -15,27 +15,7 @@ const DEFAULT_SPEED_MS       = 6.94;
 const MIN_VALID_SPEED_MS     = 0.5;
 const STOPPED_CONFIRM_COUNT  = 3;
 
-// ── Normalized stop-name lookup (tolerates case/whitespace mismatches
-//    between routes.js and stops.js) ───────────────────────────────
-const NORMALIZED_STOP_COORDS = {};
-Object.keys(STOP_COORDS).forEach(key => {
-  const normalized = key.trim().toLowerCase().replace(/\s+/g, ' ');
-  NORMALIZED_STOP_COORDS[normalized] = STOP_COORDS[key];
-});
-
-function getStopCoord(stopName) {
-  if (!stopName) return null;
-  const normalized = stopName.trim().toLowerCase().replace(/\s+/g, ' ');
-  return NORMALIZED_STOP_COORDS[normalized] || null;
-}
-
-// ── GPS Queue System ─────────────────────────────────────────
-const gpsQueue   = [];
-let isAnimating  = false;
-let lastPoint    = null;
-let predictionId = null;
-
-// ── Map setup ────────────────────────────────────────────────
+// ── Map setup (MOVED — runs first, before anything that could crash) ──
 const belagaviBounds = L.latLngBounds(
   L.latLng(BELAGAVI_BOUNDS[0][0], BELAGAVI_BOUNDS[0][1]),
   L.latLng(BELAGAVI_BOUNDS[1][0], BELAGAVI_BOUNDS[1][1])
@@ -68,6 +48,34 @@ L.marker([CAMPUS_LOCATION.lat, CAMPUS_LOCATION.lng], {
     iconAnchor: [45, 0],
   }),
 }).addTo(map);
+
+// ── Normalized stop-name lookup (MADE DEFENSIVE — won't crash the map
+//    if STOP_COORDS has a problem; just logs a clear warning instead) ──
+const NORMALIZED_STOP_COORDS = {};
+try {
+  if (typeof STOP_COORDS === 'undefined') {
+    throw new Error('STOP_COORDS is undefined — stops.js failed to load or has a syntax error');
+  }
+  Object.keys(STOP_COORDS).forEach(key => {
+    const normalized = key.trim().toLowerCase().replace(/\s+/g, ' ');
+    NORMALIZED_STOP_COORDS[normalized] = STOP_COORDS[key];
+  });
+} catch (err) {
+  console.error('[FATAL] Could not build stop lookup:', err.message);
+  document.getElementById('info').innerText = '⚠️ Stop data failed to load — check stops.js for errors';
+}
+
+function getStopCoord(stopName) {
+  if (!stopName) return null;
+  const normalized = stopName.trim().toLowerCase().replace(/\s+/g, ' ');
+  return NORMALIZED_STOP_COORDS[normalized] || null;
+}
+
+// ── GPS Queue System ─────────────────────────────────────────
+const gpsQueue   = [];
+let isAnimating  = false;
+let lastPoint    = null;
+let predictionId = null;
 
 // ── Shift dropdown ───────────────────────────────────────────
 window.onShiftChange = function () {
