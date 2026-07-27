@@ -125,14 +125,25 @@ function plotRouteStops(busKey) {
   }
 }
 
-// ── Bus icon ─────────────────────────────────────────────────
-function updateBusIcon() {
+// ── Bus icon (FIXED — mirrors to face actual direction of travel) ──
+// The 🚌 emoji faces LEFT by default in all renderers. If the bus is
+// heading with any eastward component, flip it horizontally so it visibly
+// faces the direction it's moving instead of looking like it's reversing.
+function updateBusIcon(heading) {
+  const flip = shouldFaceRight(heading);
   return L.divIcon({
     className: '',
-    html: `<div style="font-size:30px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4));">🚌</div>`,
+    html: `<div style="font-size:30px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4));transform:scaleX(${flip ? -1 : 1});">🚌</div>`,
     iconSize:   [30, 30],
     iconAnchor: [15, 15],
   });
+}
+
+function shouldFaceRight(heading) {
+  if (typeof heading !== 'number') return false;
+  // heading is compass bearing: 0=N, 90=E, 180=S, 270=W
+  const rad = heading * Math.PI / 180;
+  return Math.sin(rad) > 0; // any eastward component → flip to face right
 }
 
 // ── Queue-based smooth animation ─────────────────────────────
@@ -454,10 +465,12 @@ window.selectBus = function () {
 
     if (!busMarker) {
       busMarker = L.marker([data.lat, data.lng], {
-        icon:         updateBusIcon(),
+        icon:         updateBusIcon(data.heading),
         zIndexOffset: 1000,
       }).addTo(map);
       map.setView([data.lat, data.lng], 15);
+    } else {
+      busMarker.setIcon(updateBusIcon(data.heading));   // ADD THIS — keeps facing direction current
     }
 
     snapToRoad(data.lat, data.lng).then(snapped => {
