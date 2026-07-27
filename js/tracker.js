@@ -7,6 +7,27 @@ let map, busMarker, dbListenerRef;
 let currentBusKey  = null;
 let speedHistory   = [];
 let routeStopIndex = 0;
+let etaRequestId   = 0;
+
+// ── Constants ────────────────────────────────────────────────
+const STOP_ARRIVAL_RADIUS_KM = 0.3;
+const DEFAULT_SPEED_MS       = 6.94;
+const MIN_VALID_SPEED_MS     = 0.5;
+const STOPPED_CONFIRM_COUNT  = 3;
+
+// ── Normalized stop-name lookup (tolerates case/whitespace mismatches
+//    between routes.js and stops.js) ───────────────────────────────
+const NORMALIZED_STOP_COORDS = {};
+Object.keys(STOP_COORDS).forEach(key => {
+  const normalized = key.trim().toLowerCase().replace(/\s+/g, ' ');
+  NORMALIZED_STOP_COORDS[normalized] = STOP_COORDS[key];
+});
+
+function getStopCoord(stopName) {
+  if (!stopName) return null;
+  const normalized = stopName.trim().toLowerCase().replace(/\s+/g, ' ');
+  return NORMALIZED_STOP_COORDS[normalized] || null;
+}
 
 // ── GPS Queue System ─────────────────────────────────────────
 const gpsQueue   = [];
@@ -36,7 +57,6 @@ L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
 
 const routeMarkersGroup = L.layerGroup().addTo(map);
 
-// Campus pin
 L.circleMarker([CAMPUS_LOCATION.lat, CAMPUS_LOCATION.lng], {
   radius: 8, color: '#ffffff', weight: 2, fillColor: '#dc2626', fillOpacity: 1,
 }).addTo(map);
@@ -72,9 +92,14 @@ function plotRouteStops(busKey) {
 
   routeMarkersGroup.clearLayers();
   const stopsList = ROUTE_STOPS[busKey] || [];
+  const missingStops = [];
+
   stopsList.forEach(stopName => {
-    const coords = STOP_COORDS[stopName];
-    if (!coords) return;
+    const coords = getStopCoord(stopName);
+    if (!coords) {
+      missingStops.push(stopName);
+      return;
+    }
     L.circleMarker([coords.lat, coords.lng], {
       radius: 6, color: '#ffffff', weight: 1.8, fillColor: '#1a73e8', fillOpacity: 1,
     }).addTo(routeMarkersGroup);
@@ -86,6 +111,10 @@ function plotRouteStops(busKey) {
       }),
     }).addTo(routeMarkersGroup);
   });
+
+  if (missingStops.length > 0) {
+    console.warn(`[Route ${busKey}] Missing coordinates for:`, missingStops);
+  }
 }
 
 // ── Bus icon ─────────────────────────────────────────────────
@@ -100,6 +129,10 @@ function updateBusIcon() {
 
 // ── Queue-based smooth animation ─────────────────────────────
 function enqueuePoint(point) {
+  if (lastPoint) {
+    const dist = getDistance(lastPoint.lat, lastPoint.lng, point.lat, point.lng);
+    if (dist > 0.2 && point.speed < 5) return;
+  }
   gpsQueue.push(point);
   if (!isAnimating) processQueue();
 }
@@ -203,86 +236,163 @@ function stopPrediction() {
   }
 }
 
-// ── Calculate correct next stop ──────────────────────────────
-function calculateNextStop(busLat, busLng, busKey) {
-  const stops = ROUTE_STOPS[busKey] || [];
-  if (stops.length === 0) return;
-
-  for (let i = routeStopIndex; i < stops.length; i++) {
-    const stopName  = stops[i];
-    const stopCoord = STOP_COORDS[stopName];
-    if (!stopCoord) continue;
-
-    const dist = getDistance(busLat, busLng, stopCoord.lat, stopCoord.lng);
-
-    if (dist < 0.15 && i < stops.length - 1) {
-      routeStopIndex = i + 1;
-    } else {
-      routeStopIndex = i;
-      break;
-    }
-  }
-}
-
-// ── ETA calculation ──────────────────────────────────────────
-async function processRoadETA(driverLat, driverLng) {
+// ── Snap to road ───────────────────────────────────────────────
+async function snapToRoad(lat, lng) {
   try {
-    const activeStops = ROUTE_STOPS[currentBusKey] || [];
-    if (activeStops.length === 0) return;
-
-    const destName  = activeStops[routeStopIndex];
-    if (!destName) return;
-    const destCoord = STOP_COORDS[destName] || CAMPUS_LOCATION;
-
     const response = await fetch(
-      `https://api.olamaps.io/routing/v1/directions` +
-      `?origin=${driverLat},${driverLng}` +
-      `&destination=${destCoord.lat},${destCoord.lng}` +
-      `&overview=full` +
+      `https://api.olamaps.io/routing/v1/snapToRoads` +
+      `?points=${lat},${lng}` +
       `&api_key=${OLA_MAPS_API_KEY}`,
       { method: 'POST' }
     );
     const json = await response.json();
-    if (!json.routes || !json.routes.length) return;
-    if (json.status !== 'SUCCESS') return;
+    const points = json.snapped_points || json.snappedPoints;
+    if (points && points.length > 0) {
+      const p   = points[0];
+      const loc = p.location || p;
+      const snappedLat = loc.latitude ?? loc.lat;
+      const snappedLng = loc.longitude ?? loc.lng;
+      if (typeof snappedLat === 'number' && typeof snappedLng === 'number') {
+        return { lat: snappedLat, lng: snappedLng };
+      }
+    }
+  } catch (err) {
+    console.log('Snap to road failed:', err);
+  }
+  return { lat, lng };
+}
 
-    const leg = json.routes[0].legs.find(l => l != null);
-    if (!leg) return;
+// ── ETA color ──────────────────────────────────────────────────
+function getEtaColor(minutes) {
+  if (minutes < 5)  return '#dc2626';
+  if (minutes < 10) return '#f59e0b';
+  return '#16a34a';
+}
 
-    const roadDistanceMeters = leg.distance?.value ?? leg.distance_meters ??
-      (typeof leg.distance === 'number' ? leg.distance : 0);
-    const olaDuration = leg.duration?.value ?? leg.duration_seconds ??
-      (typeof leg.duration === 'number' ? leg.duration : 0);
-    if (!roadDistanceMeters || !olaDuration) return;
+// ── Resolve which stop index to use ──────────────────────────
+function resolveStopIndex(busKey, data) {
+  const stops = ROUTE_STOPS[busKey] || [];
+  if (stops.length === 0) return 0;
 
-    const roadDistanceKm = (roadDistanceMeters / 1000).toFixed(1);
+  if (typeof data.stopIndex === 'number' && data.stopIndex >= 0) {
+    routeStopIndex = Math.min(data.stopIndex, stops.length - 1);
+    return routeStopIndex;
+  }
 
-    let etaSeconds;
-    if (speedHistory.length > 0) {
-      const sorted     = [...speedHistory].sort((a, b) => a - b);
-      const trimmed    = sorted.slice(1, -1);
-      const avgSpeedMs = trimmed.length > 0
-        ? trimmed.reduce((a, b) => a + b, 0) / trimmed.length
-        : CITY_DEFAULT_SPEED_MS;
-      const validSpeed = avgSpeedMs > 1.5 ? avgSpeedMs : CITY_DEFAULT_SPEED_MS;
-      const olaSpeedMs = roadDistanceMeters / olaDuration;
-      const ratio      = olaSpeedMs / validSpeed;
-      etaSeconds       = olaDuration * ratio * ETA_TRAFFIC_BUFFER;
-    } else {
-      etaSeconds = olaDuration * 1.15;
+  if (routeStopIndex < stops.length - 1) {
+    const targetName  = stops[routeStopIndex];
+    const targetCoord = getStopCoord(targetName);
+    if (targetCoord) {
+      const dist = getDistance(data.lat, data.lng, targetCoord.lat, targetCoord.lng);
+      if (dist < STOP_ARRIVAL_RADIUS_KM) routeStopIndex++;
+    }
+  }
+  return routeStopIndex;
+}
+
+// ── ETA calculation ──────────────────────────────────────────
+async function processETA(busKey, data) {
+  const thisRequestId = ++etaRequestId;
+  try {
+    const stops = ROUTE_STOPS[busKey] || [];
+
+    if (stops.length === 0) {
+      document.getElementById('etaDestination').innerText =
+        `⚠️ No route found for busKey "${busKey}"`;
+      document.getElementById('etaTime').innerText = '—';
+      document.getElementById('etaDist').innerText = '';
+      return;
     }
 
-    const etaMinutes = Math.max(1, Math.round(etaSeconds / 60));
-    const isStopped  = speedHistory.length >= 3 &&
-                       speedHistory.every(s => s < 1.5);
+    const stopIndex   = resolveStopIndex(busKey, data);
+    const targetName  = stops[stopIndex];
+    const targetCoord = getStopCoord(targetName);
 
-    document.getElementById('etaTime').innerText        = isStopped ? '~' + etaMinutes : etaMinutes;
-    document.getElementById('etaDestination').innerText = `Next Stop: ${destName}`;
-    document.getElementById('etaDist').innerText        = isStopped
-      ? `${roadDistanceKm} km — Bus may be stopped`
-      : `${roadDistanceKm} km away`;
+    if (!targetCoord) {
+      document.getElementById('etaDestination').innerText =
+        `⚠️ Stop "${targetName}" has no match in stops.js`;
+      document.getElementById('etaTime').innerText = '—';
+      document.getElementById('etaDist').innerText = '';
+      console.warn(`[ETA] Unresolved stop name: "${targetName}" (busKey: ${busKey}, index: ${stopIndex})`);
+      return;
+    }
+
+    const haversineDistKm = getDistance(data.lat, data.lng, targetCoord.lat, targetCoord.lng);
+
+    if (stopIndex >= stops.length - 1 && haversineDistKm < STOP_ARRIVAL_RADIUS_KM) {
+      if (thisRequestId !== etaRequestId) return;
+      document.getElementById('etaDestination').innerText = 'Arrived at destination';
+      document.getElementById('etaTime').innerText         = '—';
+      document.getElementById('etaTime').style.color       = '#16a34a';
+      document.getElementById('etaDist').innerText         = '';
+      return;
+    }
+
+    let distanceKm  = haversineDistKm;
+    let usedRoadApi = false;
+    let etaMinutes;
+
+    const rawSpeed    = typeof data.speed === 'number' ? data.speed : 0;
+    const speedForEta = rawSpeed > MIN_VALID_SPEED_MS ? rawSpeed : DEFAULT_SPEED_MS;
+    const speedKmh    = speedForEta * 3.6;
+
+    try {
+      const response = await fetch(
+        `https://api.olamaps.io/routing/v1/directions` +
+        `?origin=${data.lat},${data.lng}` +
+        `&destination=${targetCoord.lat},${targetCoord.lng}` +
+        `&overview=full` +
+        `&api_key=${OLA_MAPS_API_KEY}`,
+        { method: 'POST' }
+      );
+      const json = await response.json();
+
+      if (json.status === 'SUCCESS' && json.routes && json.routes.length) {
+        const leg = json.routes[0].legs.find(l => l != null);
+        const roadMeters = leg?.distance?.value ?? leg?.distance_meters ??
+          (typeof leg?.distance === 'number' ? leg.distance : 0);
+        const roadDur = leg?.duration?.value ?? leg?.duration_seconds ??
+          (typeof leg?.duration === 'number' ? leg.duration : 0);
+
+        if (roadMeters > 0) {
+          distanceKm  = roadMeters / 1000;
+          usedRoadApi = true;
+          if (roadDur > 0) {
+            const olaSpeedMs = roadMeters / roadDur;
+            const ratio      = olaSpeedMs / speedForEta;
+            etaMinutes = Math.max(1, Math.round((roadDur * ratio * ETA_TRAFFIC_BUFFER) / 60));
+          }
+        }
+      }
+    } catch (err) {
+      console.debug('[ETA] OLA road route unavailable, using straight-line distance:', err.message);
+    }
+
+    if (!etaMinutes) {
+      etaMinutes = Math.max(1, Math.round((distanceKm / speedKmh) * 60));
+    }
+
+    if (rawSpeed > 0 && rawSpeed < MIN_VALID_SPEED_MS) {
+      speedHistory.push(rawSpeed);
+      if (speedHistory.length > STOPPED_CONFIRM_COUNT) speedHistory.shift();
+    } else if (rawSpeed >= MIN_VALID_SPEED_MS) {
+      speedHistory = [];
+    }
+    const isStopped = speedHistory.length >= STOPPED_CONFIRM_COUNT;
+
+    if (thisRequestId !== etaRequestId) return;
+
+    const etaEl = document.getElementById('etaTime');
+    etaEl.innerText   = isStopped ? '~' + etaMinutes : String(etaMinutes);
+    etaEl.style.color = getEtaColor(etaMinutes);
+
+    document.getElementById('etaDestination').innerText = `Next Stop: ${targetName}`;
+    document.getElementById('etaDist').innerText = isStopped
+      ? `${distanceKm.toFixed(1)} km — bus may be stopped`
+      : `${distanceKm.toFixed(1)} km away${usedRoadApi ? '' : ' (straight-line)'}`;
 
   } catch (err) {
+    document.getElementById('etaDestination').innerText = `⚠️ ETA crashed: ${err.message}`;
     console.error('ETA error:', err);
   }
 }
@@ -342,26 +452,20 @@ window.selectBus = function () {
       map.setView([data.lat, data.lng], 15);
     }
 
-    const rawSpeed = (typeof data.speed === 'number' && data.speed > 1.5) ? data.speed : null;
-    if (rawSpeed !== null) {
-      speedHistory.push(rawSpeed);
-      if (speedHistory.length > SPEED_BUFFER_SIZE) speedHistory.shift();
-    }
-
-    calculateNextStop(data.lat, data.lng, busKey);
-
-    enqueuePoint({
-      lat:       data.lat,
-      lng:       data.lng,
-      speed:     data.speed   || 0,
-      heading:   data.heading || 0,
-      updatedAt: data.updatedAt || Date.now(),
+    snapToRoad(data.lat, data.lng).then(snapped => {
+      enqueuePoint({
+        lat:       snapped.lat,
+        lng:       snapped.lng,
+        speed:     data.speed   || 0,
+        heading:   data.heading || 0,
+        updatedAt: data.updatedAt || Date.now(),
+      });
     });
 
     document.getElementById('info').innerText        = '🟢 Link Connection Active';
     document.getElementById('etaCard').style.display = 'block';
 
-    processRoadETA(data.lat, data.lng);
+    processETA(busKey, data);
   });
 };
 
