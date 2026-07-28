@@ -48,13 +48,13 @@ const ROUTE_STOPS = {
   d130_b3: ["KLS GIT", "Bogarves", "Channamma circle", "RTO", "Mahantesh Nagar", "Sidnal stop", "Nandini dairy", "More stop", "Kanbargi", "Ramtheerth Nagar", "Ganesh circle", "Uday school", "Harsha hotel ", "Sai mandir", "Shrinagar", "SGBIT", "Ramdev"],
   d130_b4: ["KLS GIT", "Pipeline","Ganeshpur","Vinayak circle","Ganapati temple","Kuvempu nagar","KLE International School","Vidya nagar","Kumar swamy layout","Hanuman nagar circle","NCC ground","Sadashiv nagar last stop"],
   d130_b5: ["KLS GIT", "Fish Market", "Channamma Circle", "RTO", "CBT"],
-  d130_b6: ["KLS GIT", "Channamma Circle", "Azam Nagar", "Indal Colony", "Kakati"],
+  d130_b6: ["KLS GIT", "Channamma Circle", "Indal Colony", "Kakati"],
   d130_b7: ["KLS GIT", "Gandhi Nagar", "SC Motors", "Basavan Kudachi", "Shindolli Cross", "Nilaji Cross", "Mutaga", "Sambra", "Balekundri", "Honyall Cross", "Pant Balekundri"],
   d130_b8: ["KLS GIT", "RPD Cross", "Goa Ves", "Tukaram Bank", "Shahapur"],
   d130_b9: ["KLS GIT", "Machhe", "BCM Hostel", "Khanapur"],
 
   // ── Drop 4:00 PM ─────────────────────────────────────────────
-  d400_b1: ["KLS GIT", "Channamma Circle", "Azam Nagar", "Indal Colony", "Kakati"],
+  d400_b1: ["KLS GIT", "Channamma Circle", "Indal Colony", "Kakati"],
   d400_b2: ["KLS GIT", "Guru Prasad Colony", "Mandoli Road", "RC Nagar"],
   d400_b3: ["KLS GIT", "RPD Cross", "Goa Ves", "Tukaram Bank", "Shahapur"],
   d400_b4: ["KLS GIT", "More", "Ganesh Temple", "Chavan Hostipal", "Vinayak Circle", "Ganapati TEemple", "Kuvempu Nagar", "KLE School", "Sahayadri Nagar", "Kumara Swamy Layout", "Hanuman Nagar 2nd Stop", "Hanuman Nagar Circle", "FirozSait Home Stop", "NCC Ground", "Neel Nagar", "Sadashiv Nagar", "Harsha"],
@@ -64,7 +64,7 @@ const ROUTE_STOPS = {
   d400_b8: ["KLS GIT", "Fish Market", "Channamma Circle", "RTO", "CBT"],
 
   // ── Drop 5:15 PM ─────────────────────────────────────────────
-  d515_b1:  ["KLS GIT", "Channamma Circle", "Azam Nagar", "Indal Colony", "Kakati"],
+  d515_b1:  ["KLS GIT", "Channamma Circle", "Indal Colony", "Kakati"],
   d515_b2:  ["KLS GIT", "RPD Cross", "Goa Ves", "Nath Pai Circle", "Vadagaon"],
   d515_b3:  ["KLS GIT", "Guru Prasad Colony", "Mandoli Road", "RC Nagar"],
   d515_b4:  ["KLS GIT", "RPD Cross", "Goa Ves", "Tukaram Bank", "Shahapur"],
