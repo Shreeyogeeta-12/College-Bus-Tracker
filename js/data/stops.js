@@ -35,7 +35,6 @@ const STOP_COORDS = {
   "Janata plot":              { lat: 15.885793559614829, lng: 74.53787674914886 },
   "Sai mandir ":              { lat: 15.88180173133962,  lng: 74.53253209646233 },
   "Shrinagar garden":         { lat: 15.880628133488766, lng: 74.5295568729132  },
-  "Ramtheerth Nagar":         { lat: 15.887393551711304, lng: 74.54183239725833 }, // approx Harsha Hotel area
 
   // ── Mahantesh Nagar / Sidnal area ───────────────────────────
   "Nandini dairy":            { lat: 15.8698,            lng: 74.5342            },

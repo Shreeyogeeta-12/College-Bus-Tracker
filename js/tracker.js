@@ -446,7 +446,7 @@ window.selectBus = function () {
 
     if (data && data.updatedAt) {
       const ageHours = (Date.now() - data.updatedAt) / (1000 * 60 * 60);
-      if (ageHours > SHIFT_END_CLEANUP_HOURS) {
+      if (ageHours > 12) {
         db.ref('liveLocation/' + busKey).remove();
         return;
       }
