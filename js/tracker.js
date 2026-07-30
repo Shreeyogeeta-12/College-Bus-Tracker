@@ -7,15 +7,14 @@ let map, busMarker, dbListenerRef;
 let currentBusKey  = null;
 let speedHistory   = [];
 let routeStopIndex = 0;
-let etaRequestId   = 0;
 
-// ── Constants ────────────────────────────────────────────────
-const STOP_ARRIVAL_RADIUS_KM = 0.3;
-const DEFAULT_SPEED_MS       = 6.94;
-const MIN_VALID_SPEED_MS     = 0.5;
-const STOPPED_CONFIRM_COUNT  = 3;
+// ── GPS Queue System ─────────────────────────────────────────
+const gpsQueue   = [];
+let isAnimating  = false;
+let lastPoint    = null;
+let predictionId = null;
 
-// ── Map setup (MOVED — runs first, before anything that could crash) ──
+// ── Map setup ────────────────────────────────────────────────
 const belagaviBounds = L.latLngBounds(
   L.latLng(BELAGAVI_BOUNDS[0][0], BELAGAVI_BOUNDS[0][1]),
   L.latLng(BELAGAVI_BOUNDS[1][0], BELAGAVI_BOUNDS[1][1])
@@ -37,6 +36,7 @@ L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
 
 const routeMarkersGroup = L.layerGroup().addTo(map);
 
+// Campus pin
 L.circleMarker([CAMPUS_LOCATION.lat, CAMPUS_LOCATION.lng], {
   radius: 8, color: '#ffffff', weight: 2, fillColor: '#dc2626', fillOpacity: 1,
 }).addTo(map);
@@ -48,34 +48,6 @@ L.marker([CAMPUS_LOCATION.lat, CAMPUS_LOCATION.lng], {
     iconAnchor: [45, 0],
   }),
 }).addTo(map);
-
-// ── Normalized stop-name lookup (MADE DEFENSIVE — won't crash the map
-//    if STOP_COORDS has a problem; just logs a clear warning instead) ──
-const NORMALIZED_STOP_COORDS = {};
-try {
-  if (typeof STOP_COORDS === 'undefined') {
-    throw new Error('STOP_COORDS is undefined — stops.js failed to load or has a syntax error');
-  }
-  Object.keys(STOP_COORDS).forEach(key => {
-    const normalized = key.trim().toLowerCase().replace(/\s+/g, ' ');
-    NORMALIZED_STOP_COORDS[normalized] = STOP_COORDS[key];
-  });
-} catch (err) {
-  console.error('[FATAL] Could not build stop lookup:', err.message);
-  document.getElementById('info').innerText = '⚠️ Stop data failed to load — check stops.js for errors';
-}
-
-function getStopCoord(stopName) {
-  if (!stopName) return null;
-  const normalized = stopName.trim().toLowerCase().replace(/\s+/g, ' ');
-  return NORMALIZED_STOP_COORDS[normalized] || null;
-}
-
-// ── GPS Queue System ─────────────────────────────────────────
-const gpsQueue   = [];
-let isAnimating  = false;
-let lastPoint    = null;
-let predictionId = null;
 
 // ── Shift dropdown ───────────────────────────────────────────
 window.onShiftChange = function () {
@@ -100,14 +72,9 @@ function plotRouteStops(busKey) {
 
   routeMarkersGroup.clearLayers();
   const stopsList = ROUTE_STOPS[busKey] || [];
-  const missingStops = [];
-
   stopsList.forEach(stopName => {
-    const coords = getStopCoord(stopName);
-    if (!coords) {
-      missingStops.push(stopName);
-      return;
-    }
+    const coords = STOP_COORDS[stopName];
+    if (!coords) return;
     L.circleMarker([coords.lat, coords.lng], {
       radius: 6, color: '#ffffff', weight: 1.8, fillColor: '#1a73e8', fillOpacity: 1,
     }).addTo(routeMarkersGroup);
@@ -119,31 +86,16 @@ function plotRouteStops(busKey) {
       }),
     }).addTo(routeMarkersGroup);
   });
-
-  if (missingStops.length > 0) {
-    console.warn(`[Route ${busKey}] Missing coordinates for:`, missingStops);
-  }
 }
 
-// ── Bus icon (FIXED — mirrors to face actual direction of travel) ──
-// The 🚌 emoji faces LEFT by default in all renderers. If the bus is
-// heading with any eastward component, flip it horizontally so it visibly
-// faces the direction it's moving instead of looking like it's reversing.
-function updateBusIcon(heading) {
-  const flip = shouldFaceRight(heading);
+// ── Bus icon ─────────────────────────────────────────────────
+function updateBusIcon() {
   return L.divIcon({
     className: '',
-    html: `<div style="font-size:30px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4));transform:scaleX(${flip ? -1 : 1});">🚌</div>`,
+    html: `<div style="font-size:30px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4));">🚌</div>`,
     iconSize:   [30, 30],
     iconAnchor: [15, 15],
   });
-}
-
-function shouldFaceRight(heading) {
-  if (typeof heading !== 'number') return false;
-  // heading is compass bearing: 0=N, 90=E, 180=S, 270=W
-  const rad = heading * Math.PI / 180;
-  return Math.sin(rad) > 0; // any eastward component → flip to face right
 }
 
 // ── Queue-based smooth animation ─────────────────────────────
@@ -255,7 +207,7 @@ function stopPrediction() {
   }
 }
 
-// ── Snap to road ───────────────────────────────────────────────
+// ── Snap to road ─────────────────────────────────────────────
 async function snapToRoad(lat, lng) {
   try {
     const response = await fetch(
@@ -265,15 +217,11 @@ async function snapToRoad(lat, lng) {
       { method: 'POST' }
     );
     const json = await response.json();
-    const points = json.snapped_points || json.snappedPoints;
-    if (points && points.length > 0) {
-      const p   = points[0];
-      const loc = p.location || p;
-      const snappedLat = loc.latitude ?? loc.lat;
-      const snappedLng = loc.longitude ?? loc.lng;
-      if (typeof snappedLat === 'number' && typeof snappedLng === 'number') {
-        return { lat: snappedLat, lng: snappedLng };
-      }
+    if (json.snapped_points && json.snapped_points.length > 0) {
+      return {
+        lat: json.snapped_points[0].location.latitude,
+        lng: json.snapped_points[0].location.longitude,
+      };
     }
   } catch (err) {
     console.log('Snap to road failed:', err);
@@ -281,137 +229,98 @@ async function snapToRoad(lat, lng) {
   return { lat, lng };
 }
 
-// ── ETA color ──────────────────────────────────────────────────
+// ── ETA color ────────────────────────────────────────────────
 function getEtaColor(minutes) {
   if (minutes < 5)  return '#dc2626';
   if (minutes < 10) return '#f59e0b';
   return '#16a34a';
 }
 
-// ── Resolve which stop index to use ──────────────────────────
-function resolveStopIndex(busKey, data) {
-  const stops = ROUTE_STOPS[busKey] || [];
-  if (stops.length === 0) return 0;
-
-  if (typeof data.stopIndex === 'number' && data.stopIndex >= 0) {
-    routeStopIndex = Math.min(data.stopIndex, stops.length - 1);
-    return routeStopIndex;
-  }
-
-  if (routeStopIndex < stops.length - 1) {
-    const targetName  = stops[routeStopIndex];
-    const targetCoord = getStopCoord(targetName);
-    if (targetCoord) {
-      const dist = getDistance(data.lat, data.lng, targetCoord.lat, targetCoord.lng);
-      if (dist < STOP_ARRIVAL_RADIUS_KM) routeStopIndex++;
-    }
-  }
-  return routeStopIndex;
-}
-
-// ── ETA calculation ──────────────────────────────────────────
-async function processETA(busKey, data) {
-  const thisRequestId = ++etaRequestId;
+// ── ETA calculation — uses stopIndex from Firebase ───────────
+async function processRoadETA(busLat, busLng, busSpeed, firebaseStopIndex, busKey) {
   try {
     const stops = ROUTE_STOPS[busKey] || [];
+    if (stops.length === 0) return;
 
-    if (stops.length === 0) {
-      document.getElementById('etaDestination').innerText =
-        `⚠️ No route found for busKey "${busKey}"`;
-      document.getElementById('etaTime').innerText = '—';
-      document.getElementById('etaDist').innerText = '';
-      return;
-    }
+    // ── Use stopIndex from Firebase directly ─────────────────
+    const nextIdx = (typeof firebaseStopIndex === 'number') ? firebaseStopIndex : 0;
 
-    const stopIndex   = resolveStopIndex(busKey, data);
-    const targetName  = stops[stopIndex];
-    const targetCoord = getStopCoord(targetName);
-
-    if (!targetCoord) {
-      document.getElementById('etaDestination').innerText =
-        `⚠️ Stop "${targetName}" has no match in stops.js`;
-      document.getElementById('etaTime').innerText = '—';
-      document.getElementById('etaDist').innerText = '';
-      console.warn(`[ETA] Unresolved stop name: "${targetName}" (busKey: ${busKey}, index: ${stopIndex})`);
-      return;
-    }
-
-    const haversineDistKm = getDistance(data.lat, data.lng, targetCoord.lat, targetCoord.lng);
-
-    if (stopIndex >= stops.length - 1 && haversineDistKm < STOP_ARRIVAL_RADIUS_KM) {
-      if (thisRequestId !== etaRequestId) return;
+    // ── All stops passed — arrived ───────────────────────────
+    if (nextIdx >= stops.length) {
+      document.getElementById('etaTime').innerText        = '✅';
       document.getElementById('etaDestination').innerText = 'Arrived at destination';
-      document.getElementById('etaTime').innerText         = '—';
-      document.getElementById('etaTime').style.color       = '#16a34a';
-      document.getElementById('etaDist').innerText         = '';
+      document.getElementById('etaDist').innerText        = '';
       return;
     }
 
-    let distanceKm  = haversineDistKm;
-    let usedRoadApi = false;
-    let etaMinutes;
+    const nextStopName  = stops[nextIdx];
+    const nextStopCoord = STOP_COORDS[nextStopName];
+    if (!nextStopCoord) return;
 
-    const rawSpeed    = typeof data.speed === 'number' ? data.speed : 0;
-    const speedForEta = rawSpeed > MIN_VALID_SPEED_MS ? rawSpeed : DEFAULT_SPEED_MS;
-    const speedKmh    = speedForEta * 3.6;
+    // ── Haversine distance to next stop ──────────────────────
+    const distKm = getDistance(busLat, busLng, nextStopCoord.lat, nextStopCoord.lng);
+
+    // ── Speed — use real or fallback 25 km/h ─────────────────
+    const speedMs  = (busSpeed && busSpeed > 0.5) ? busSpeed : CITY_DEFAULT_SPEED_MS;
+    const speedKmh = speedMs * 3.6;
+
+    // ── ETA — try Ola Maps first ──────────────────────────────
+    let etaMinutes = null;
+    let roadDistKm = distKm;
 
     try {
       const response = await fetch(
         `https://api.olamaps.io/routing/v1/directions` +
-        `?origin=${data.lat},${data.lng}` +
-        `&destination=${targetCoord.lat},${targetCoord.lng}` +
+        `?origin=${busLat},${busLng}` +
+        `&destination=${nextStopCoord.lat},${nextStopCoord.lng}` +
         `&overview=full` +
         `&api_key=${OLA_MAPS_API_KEY}`,
         { method: 'POST' }
       );
       const json = await response.json();
 
-      if (json.status === 'SUCCESS' && json.routes && json.routes.length) {
+      if (json.status === 'SUCCESS' && json.routes && json.routes.length > 0) {
         const leg = json.routes[0].legs.find(l => l != null);
-        const roadMeters = leg?.distance?.value ?? leg?.distance_meters ??
-          (typeof leg?.distance === 'number' ? leg.distance : 0);
-        const roadDur = leg?.duration?.value ?? leg?.duration_seconds ??
-          (typeof leg?.duration === 'number' ? leg.duration : 0);
+        if (leg) {
+          const roadDist = leg.distance?.value ?? leg.distance_meters ??
+            (typeof leg.distance === 'number' ? leg.distance : 0);
+          const roadDur  = leg.duration?.value ?? leg.duration_seconds ??
+            (typeof leg.duration === 'number' ? leg.duration : 0);
 
-        if (roadMeters > 0) {
-          distanceKm  = roadMeters / 1000;
-          usedRoadApi = true;
-          if (roadDur > 0) {
-            const olaSpeedMs = roadMeters / roadDur;
-            const ratio      = olaSpeedMs / speedForEta;
-            etaMinutes = Math.max(1, Math.round((roadDur * ratio * ETA_TRAFFIC_BUFFER) / 60));
+          if (roadDist && roadDur) {
+            roadDistKm     = roadDist / 1000;
+            const olaSpeed = roadDist / roadDur;
+            const ratio    = olaSpeed / speedMs;
+            etaMinutes     = Math.max(1, Math.round((roadDur * ratio * ETA_TRAFFIC_BUFFER) / 60));
           }
         }
       }
     } catch (err) {
-      console.debug('[ETA] OLA road route unavailable, using straight-line distance:', err.message);
+      console.log('Ola Maps failed, using haversine');
     }
 
+    // ── Fallback haversine ETA ────────────────────────────────
     if (!etaMinutes) {
-      etaMinutes = Math.max(1, Math.round((distanceKm / speedKmh) * 60));
+      etaMinutes = Math.max(1, Math.round((distKm / speedKmh) * 60));
     }
 
-    if (rawSpeed > 0 && rawSpeed < MIN_VALID_SPEED_MS) {
-      speedHistory.push(rawSpeed);
-      if (speedHistory.length > STOPPED_CONFIRM_COUNT) speedHistory.shift();
-    } else if (rawSpeed >= MIN_VALID_SPEED_MS) {
-      speedHistory = [];
-    }
-    const isStopped = speedHistory.length >= STOPPED_CONFIRM_COUNT;
+    // ── Stopped bus ───────────────────────────────────────────
+    const isStopped = speedHistory.length >= 3 &&
+                      speedHistory.every(s => s < 0.5);
 
-    if (thisRequestId !== etaRequestId) return;
+    // ── Update ETA card ───────────────────────────────────────
+    const etaEl  = document.getElementById('etaTime');
+    const destEl = document.getElementById('etaDestination');
+    const distEl = document.getElementById('etaDist');
 
-    const etaEl = document.getElementById('etaTime');
     etaEl.innerText   = isStopped ? '~' + etaMinutes : String(etaMinutes);
     etaEl.style.color = getEtaColor(etaMinutes);
-
-    document.getElementById('etaDestination').innerText = `Next Stop: ${targetName}`;
-    document.getElementById('etaDist').innerText = isStopped
-      ? `${distanceKm.toFixed(1)} km — bus may be stopped`
-      : `${distanceKm.toFixed(1)} km away${usedRoadApi ? '' : ' (straight-line)'}`;
+    destEl.innerText  = `Next Stop: ${nextStopName}`;
+    distEl.innerText  = isStopped
+      ? `${roadDistKm.toFixed(1)} km — Bus may be stopped`
+      : `${roadDistKm.toFixed(1)} km away`;
 
   } catch (err) {
-    document.getElementById('etaDestination').innerText = `⚠️ ETA crashed: ${err.message}`;
     console.error('ETA error:', err);
   }
 }
@@ -444,14 +353,16 @@ window.selectBus = function () {
   dbListenerRef = db.ref('liveLocation/' + busKey).on('value', snap => {
     const data = snap.val();
 
+    // ── Stale check ──────────────────────────────────────────
     if (data && data.updatedAt) {
       const ageHours = (Date.now() - data.updatedAt) / (1000 * 60 * 60);
-      if (ageHours > 12) {
+      if (ageHours > SHIFT_END_CLEANUP_HOURS) {
         db.ref('liveLocation/' + busKey).remove();
         return;
       }
     }
 
+    // ── Bus offline ──────────────────────────────────────────
     if (!data || !data.lat || !data.lng) {
       document.getElementById('info').innerText        = '🔴 Bus is currently OFFLINE';
       document.getElementById('etaCard').style.display = 'none';
@@ -463,16 +374,23 @@ window.selectBus = function () {
       return;
     }
 
+    // ── Create marker ────────────────────────────────────────
     if (!busMarker) {
       busMarker = L.marker([data.lat, data.lng], {
-        icon:         updateBusIcon(data.heading),
+        icon:         updateBusIcon(),
         zIndexOffset: 1000,
       }).addTo(map);
       map.setView([data.lat, data.lng], 15);
-    } else {
-      busMarker.setIcon(updateBusIcon(data.heading));   // ADD THIS — keeps facing direction current
     }
 
+    // ── Speed history ─────────────────────────────────────────
+    const rawSpeed = (typeof data.speed === 'number' && data.speed > 0.5) ? data.speed : null;
+    if (rawSpeed !== null) {
+      speedHistory.push(rawSpeed);
+      if (speedHistory.length > SPEED_BUFFER_SIZE) speedHistory.shift();
+    }
+
+    // ── Snap to road then animate ─────────────────────────────
     snapToRoad(data.lat, data.lng).then(snapped => {
       enqueuePoint({
         lat:       snapped.lat,
@@ -483,10 +401,12 @@ window.selectBus = function () {
       });
     });
 
+    // ── Update UI ─────────────────────────────────────────────
     document.getElementById('info').innerText        = '🟢 Link Connection Active';
     document.getElementById('etaCard').style.display = 'block';
 
-    processETA(busKey, data);
+    // ── ETA using stopIndex from Firebase ────────────────────
+    processRoadETA(data.lat, data.lng, data.speed, data.stopIndex, busKey);
   });
 };
 
