@@ -9,15 +9,13 @@ let gpsCount   = 0;
 let selBus     = '';
 let selTrip    = '';
 let gpsBuffer  = [];
-let routeStopIndex = 0;   // NEW — persistent, sequential, forward-only
-
-const STOP_ARRIVAL_RADIUS_KM = 0.3;
 
 // ── Clock ────────────────────────────────────────────────────
 setInterval(() => {
   const n = new Date();
   document.getElementById('clock').innerText =
-    String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0');
+    String(n.getHours()).padStart(2, '0') + ':' +
+    String(n.getMinutes()).padStart(2, '0');
 }, 1000);
 
 // ── Keep GPS alive ───────────────────────────────────────────
@@ -53,7 +51,6 @@ function onTripChange() {
 // ── Bus change ───────────────────────────────────────────────
 function onBusChange() {
   selBus = document.getElementById('busSelect').value;
-  routeStopIndex = 0;   // NEW — reset for the newly selected route
   if (!selBus || !selTrip) return;
 
   const stops = ROUTE_STOPS[selBus] || [];
@@ -117,29 +114,30 @@ function getSmoothedLocation(lat, lng) {
   return { lat: smoothLat, lng: smoothLng };
 }
 
-// ── Advance stop progress (FIXED — sequential, forward-only) ──
-// Only checks the CURRENT target stop, never re-scans the whole route.
-// This is what prevents the "immediately shows final stop" bug that
-// happened with routes looping back through the same KLS GIT coordinates.
-function advanceStopProgress(lat, lng) {
-  const stops = ROUTE_STOPS[selBus] || [];
-  if (stops.length === 0) return;
+// ── Calculate stop index correctly ───────────────────────────
+function calculateStopIndex(lat, lng, stops) {
+  let passedIndex = 0;
 
-  if (routeStopIndex < stops.length - 1) {
-    const targetName  = stops[routeStopIndex];
-    const targetCoord = STOP_COORDS[targetName];
-    if (targetCoord) {
-      const dist = getDistance(lat, lng, targetCoord.lat, targetCoord.lng);
-      if (dist < STOP_ARRIVAL_RADIUS_KM) {
-        routeStopIndex++;
-      }
+  for (let i = 0; i < stops.length; i++) {
+    const coord = STOP_COORDS[stops[i]];
+    if (!coord) continue;
+    const dist = getDistance(lat, lng, coord.lat, coord.lng);
+
+    // If bus is within 300m of this stop — mark as passed
+    if (dist < 0.3) {
+      passedIndex = i + 1;
     }
   }
 
-  updateStopProgress(routeStopIndex);
+  // Cap at last stop index
+  if (passedIndex >= stops.length) {
+    passedIndex = stops.length - 1;
+  }
+
+  return passedIndex;
 }
 
-// ── GPS Watcher (restartable) ────────────────────────────────
+// ── GPS Watcher ──────────────────────────────────────────────
 function startWatching() {
   if (watchId) {
     navigator.geolocation.clearWatch(watchId);
@@ -148,8 +146,15 @@ function startWatching() {
 
   watchId = navigator.geolocation.watchPosition(
     pos => {
-      const { latitude: rawLat, longitude: rawLng, heading, speed, accuracy } = pos.coords;
+      const {
+        latitude:  rawLat,
+        longitude: rawLng,
+        heading,
+        speed,
+        accuracy,
+      } = pos.coords;
 
+      // Show accuracy status
       if (accuracy > 100) {
         document.getElementById('gpsVal').innerText =
           '⚠️ GPS: ' + Math.round(accuracy) + 'm — Move outdoors';
@@ -162,10 +167,23 @@ function startWatching() {
       gpsCount++;
       document.getElementById('gpsCount').innerText = gpsCount;
 
+      // Smooth GPS
       const { lat, lng } = getSmoothedLocation(rawLat, rawLng);
 
-      advanceStopProgress(lat, lng);   // FIXED — replaces the old forEach scan
+      // Get stops for this bus
+      const stops = ROUTE_STOPS[selBus] || [];
 
+      // Calculate correct stop index
+      const stopIndex = calculateStopIndex(lat, lng, stops);
+
+      // Update driver panel stop progress
+      updateStopProgress(stopIndex);
+
+      // Update next stop display
+      const nextStop = stops[stopIndex] || stops[stops.length - 1] || '—';
+      document.getElementById('nextStop').innerText = nextStop;
+
+      // Send to Firebase
       db.ref('liveLocation/' + selBus).set({
         lat,
         lng,
@@ -173,7 +191,7 @@ function startWatching() {
         speed:     speed     || 0,
         accuracy:  accuracy,
         trip:      selTrip,
-        stopIndex: routeStopIndex,   // FIXED — this was missing entirely
+        stopIndex: stopIndex,
         updatedAt: Date.now(),
       });
     },
@@ -190,7 +208,6 @@ function startTracking() {
   isTracking = true;
   gpsBuffer  = [];
   gpsCount   = 0;
-  routeStopIndex = 0;   // NEW — fresh start for this trip
 
   document.getElementById('bigCircle').classList.add('live');
   document.getElementById('ctext').innerText    = 'SHARING LIVE';
