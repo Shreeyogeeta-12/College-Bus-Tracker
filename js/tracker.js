@@ -88,11 +88,7 @@ function plotRouteStops(busKey) {
   });
 }
 
-// ── Bus icon — red teardrop pin, bus emoji inside a white circle ──
-// A pin shape has no inherent "facing" direction, unlike the plain 🚌
-// emoji — so there's nothing left that can ever point the wrong way.
-// Only the TIP of the pin matters, and it's anchored precisely on the
-// GPS point (the road), same as a standard Google Maps location pin.
+// ── Bus icon — red teardrop pin, bus icon inside a white circle ──
 function updateBusIcon() {
   return L.divIcon({
     className: '',
@@ -103,13 +99,14 @@ function updateBusIcon() {
           <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z" fill="#dc2626"/>
           <circle cx="12" cy="12" r="9" fill="#ffffff"/>
         </svg>
-        <div style="position:absolute; top:15px; left:15px; transform:translate(-50%,-50%); font-size:14px; line-height:1;">🚌</div>
+        <div style="position:absolute; top:15px; left:15px; transform:translate(-50%,-50%); font-size:16px; line-height:1;">&#128652;</div>
       </div>
     `,
     iconSize:   [30, 45],
-    iconAnchor: [15, 45],   // ← the sharp TIP of the pin, not the center — this is what sits exactly on the road
+    iconAnchor: [15, 45],
   });
 }
+
 
 // ── Queue-based smooth animation ─────────────────────────────
 function enqueuePoint(point) {
