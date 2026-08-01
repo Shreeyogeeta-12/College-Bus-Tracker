@@ -88,7 +88,8 @@ function plotRouteStops(busKey) {
   });
 }
 
-// ── Bus icon — red teardrop pin, bus icon inside a white circle ──
+// ── Bus icon — red teardrop pin, SVG bus (not emoji — renders reliably
+// on every device, unlike emoji glyphs which some WebViews fail to draw) ──
 function updateBusIcon() {
   return L.divIcon({
     className: '',
@@ -98,8 +99,10 @@ function updateBusIcon() {
              style="position:absolute; top:0; left:0; filter:drop-shadow(0 2px 3px rgba(0,0,0,0.45));">
           <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z" fill="#dc2626"/>
           <circle cx="12" cy="12" r="9" fill="#ffffff"/>
+          <g transform="translate(5,5) scale(0.6)">
+            <path d="M4 16c0 .88.39 1.67 1 2.22V20c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h8v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM18 11H6V6h12v5z" fill="#1a73e8"/>
+          </g>
         </svg>
-        <div style="position:absolute; top:15px; left:15px; transform:translate(-50%,-50%); font-size:16px; line-height:1;">&#128652;</div>
       </div>
     `,
     iconSize:   [30, 45],
@@ -107,6 +110,43 @@ function updateBusIcon() {
   });
 }
 
+// ── Predictive movement (FIXED — stops after a few seconds instead of
+//    dead-reckoning forever if no new GPS ping arrives) ──
+function startPrediction() {
+  if (!lastPoint || lastPoint.speed < 1.5) return;
+  stopPrediction();
+
+  const MAX_PREDICTION_MS = 5000; // freeze in place after 5s without a real update
+  const predStart = performance.now();
+
+  const speedMs    = lastPoint.speed;
+  const headingRad = (lastPoint.heading || 0) * Math.PI / 180;
+  let   predLat    = lastPoint.lat;
+  let   predLng    = lastPoint.lng;
+  let   lastTime   = performance.now();
+
+  function predict(now) {
+    if (now - predStart > MAX_PREDICTION_MS) {
+      predictionId = null; // stop — wait for a real GPS fix instead of guessing further
+      return;
+    }
+
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+
+    const dLat = (speedMs * dt * Math.cos(headingRad)) / 111320;
+    const dLng = (speedMs * dt * Math.sin(headingRad)) /
+                 (111320 * Math.cos(predLat * Math.PI / 180));
+
+    predLat += dLat;
+    predLng += dLng;
+
+    if (busMarker) busMarker.setLatLng([predLat, predLng]);
+    predictionId = requestAnimationFrame(predict);
+  }
+
+  predictionId = requestAnimationFrame(predict);
+}
 
 // ── Queue-based smooth animation ─────────────────────────────
 function enqueuePoint(point) {
