@@ -106,7 +106,7 @@ function updateBusIcon() {
       </div>
     `,
     iconSize:   [30, 45],
-    iconAnchor: [15, 45],
+    iconAnchor: [15, 44],
   });
 }
 
