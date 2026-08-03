@@ -34,7 +34,7 @@ const ROUTE_STOPS = {
   m900_b5:  ["KLS GIT", "Ganesh Temple", "Kuvempu Nagar", "KLE School", "Sahaydri Nagar", "Kumarswamy Layout", "Hostel","Hanuman Nagar 2nd Stop", "Hanuman Nagar Circle","NCC ground","Rail nagar", "Sadashiv Nagar Last Stop", "Channamma Circle", "Bogarves", "Congress Road"],
   m900_b6:  ["KLS GIT", "Ganapati Temple", "Vijayanagar 2nd Stop", "Hindalga Jail", "Sulaga", "Uchagoan Cross", "Kranti Nagar", "Ganeshpur", "Pipeline", "Vinayak Nagar"],
   m900_b7:  ["KLS GIT", "Swaroop Theater", "Kapileshwar", "Renuka Hotel", "Apoorva Hostipal", "Bhatkande School", "Tukaram Bank", "Datt Mandir", "Goaves"],
-  m900_b8:  ["KLS GIT", "Kakati","Honaga","Kakati Police station","Yamnapur", "Indal bridge","Nexa showroom","Visha Dhaba","Shahunagar cross","Basavan temple","Nehru nagar hostel","Shri Laxmi complex", "Channamma Circle"],
+  m900_b8:  ["KLS GIT", "Kakati","Honaga","Kakati Police station","Yamnapur", "Indal bridge","Nexa showroom","Vishal Dhaba","Shahunagar cross","Basavan temple","Nehru nagar hostel","Shri Laxmi complex", "Channamma Circle"],
   m900_b9:  ["KLS GIT", "Ladies Hostel", "City Hall", "Allahabad Bank", "Netra Group", "Chidambar Nagar 1at Stop", "Mandar Hotel", "Hari Mandir", "Big Bazar", "Banko"],
   m900_b10: ["KLS GIT", "Marihal", "Modaga", "Anand Nagar", "Pant Balekundari", "Honnalli", "Balekundri", "Sambra", "Mutaga", "Niliji", "Shindoli", "Basavan Kudachi", "SC Motors", "Gandhi Nagar"],
   m900_b11: ["KLS GIT", "CBT", "Fort Circle", "RTO", "Chennamma Circle", "Bogarves", "Fish Market", "Gogte Circle","1st Gate", "2nd Gate", "3rd Gate"],
