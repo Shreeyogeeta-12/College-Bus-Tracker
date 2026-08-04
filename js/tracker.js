@@ -2,32 +2,23 @@
    tracker.js — Student-facing bus tracker logic
    ============================================================ */
 
-// ── State ────────────────────────────────────────────────────
 let map, busMarker, dbListenerRef;
-let currentBusKey  = null;
-let speedHistory   = [];
-let routeStopIndex = 0;
+let currentBusKey = null;
+let speedHistory  = [];
 
-// ── GPS Queue System ─────────────────────────────────────────
 const gpsQueue   = [];
 let isAnimating  = false;
 let lastPoint    = null;
 let predictionId = null;
 
-// ── Map setup ────────────────────────────────────────────────
 const belagaviBounds = L.latLngBounds(
   L.latLng(BELAGAVI_BOUNDS[0][0], BELAGAVI_BOUNDS[0][1]),
   L.latLng(BELAGAVI_BOUNDS[1][0], BELAGAVI_BOUNDS[1][1])
 );
 
 map = L.map('map', {
-  center:              [15.8500, 74.5100],
-  zoom:                13,
-  minZoom:             10,
-  maxZoom:             18,
-  maxBounds:           belagaviBounds,
-  maxBoundsViscosity:  1.0,
-  zoomControl:         false,
+  center: [15.8500, 74.5100], zoom: 13, minZoom: 10, maxZoom: 18,
+  maxBounds: belagaviBounds, maxBoundsViscosity: 1.0, zoomControl: false,
 });
 
 L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
@@ -36,7 +27,6 @@ L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
 
 const routeMarkersGroup = L.layerGroup().addTo(map);
 
-// Campus pin
 L.circleMarker([CAMPUS_LOCATION.lat, CAMPUS_LOCATION.lng], {
   radius: 8, color: '#ffffff', weight: 2, fillColor: '#dc2626', fillOpacity: 1,
 }).addTo(map);
@@ -49,21 +39,19 @@ L.marker([CAMPUS_LOCATION.lat, CAMPUS_LOCATION.lng], {
   }),
 }).addTo(map);
 
-// ── Shift dropdown ───────────────────────────────────────────
 window.onShiftChange = function () {
   const shift     = document.getElementById('shiftSelect').value;
   const busSelect = document.getElementById('busSelect');
   busSelect.innerHTML = '<option value="">-- Choose Bus --</option>';
   if (!shift) return;
   SHIFT_BUSES[shift].forEach(bus => {
-    const opt       = document.createElement('option');
-    opt.value       = bus.id;
+    const opt = document.createElement('option');
+    opt.value = bus.id;
     opt.textContent = bus.label;
     busSelect.appendChild(opt);
   });
 };
 
-// ── Draw route stops ─────────────────────────────────────────
 function plotRouteStops(busKey) {
   setTimeout(() => {
     document.getElementById('topbar').classList.add('collapsed');
@@ -88,67 +76,14 @@ function plotRouteStops(busKey) {
   });
 }
 
-// ── Bus icon — red teardrop pin, SVG bus (not emoji — renders reliably
-// on every device, unlike emoji glyphs which some WebViews fail to draw) ──
 function updateBusIcon() {
   return L.divIcon({
     className: '',
-    html: `
-      <div style="position:relative; width:30px; height:45px;">
-        <svg width="30" height="45" viewBox="0 0 24 36" xmlns="http://www.w3.org/2000/svg"
-             style="position:absolute; top:0; left:0; filter:drop-shadow(0 2px 3px rgba(0,0,0,0.45));">
-          <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z" fill="#dc2626"/>
-          <circle cx="12" cy="12" r="9" fill="#ffffff"/>
-          <g transform="translate(5,5) scale(0.6)">
-            <path d="M4 16c0 .88.39 1.67 1 2.22V20c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h8v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM18 11H6V6h12v5z" fill="#1a73e8"/>
-          </g>
-        </svg>
-      </div>
-    `,
-    iconSize:   [30, 45],
-    iconAnchor: [15, 44],
+    html: `<div style="font-size:30px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4));">🚌</div>`,
+    iconSize: [30, 30], iconAnchor: [15, 15],
   });
 }
 
-// ── Predictive movement (FIXED — stops after a few seconds instead of
-//    dead-reckoning forever if no new GPS ping arrives) ──
-function startPrediction() {
-  if (!lastPoint || lastPoint.speed < 1.5) return;
-  stopPrediction();
-
-  const MAX_PREDICTION_MS = 5000; // freeze in place after 5s without a real update
-  const predStart = performance.now();
-
-  const speedMs    = lastPoint.speed;
-  const headingRad = (lastPoint.heading || 0) * Math.PI / 180;
-  let   predLat    = lastPoint.lat;
-  let   predLng    = lastPoint.lng;
-  let   lastTime   = performance.now();
-
-  function predict(now) {
-    if (now - predStart > MAX_PREDICTION_MS) {
-      predictionId = null; // stop — wait for a real GPS fix instead of guessing further
-      return;
-    }
-
-    const dt = (now - lastTime) / 1000;
-    lastTime = now;
-
-    const dLat = (speedMs * dt * Math.cos(headingRad)) / 111320;
-    const dLng = (speedMs * dt * Math.sin(headingRad)) /
-                 (111320 * Math.cos(predLat * Math.PI / 180));
-
-    predLat += dLat;
-    predLng += dLng;
-
-    if (busMarker) busMarker.setLatLng([predLat, predLng]);
-    predictionId = requestAnimationFrame(predict);
-  }
-
-  predictionId = requestAnimationFrame(predict);
-}
-
-// ── Queue-based smooth animation ─────────────────────────────
 function enqueuePoint(point) {
   if (lastPoint) {
     const dist = getDistance(lastPoint.lat, lastPoint.lng, point.lat, point.lng);
@@ -161,12 +96,9 @@ function enqueuePoint(point) {
 function processQueue() {
   if (gpsQueue.length === 0) {
     isAnimating = false;
-    if (lastPoint && lastPoint.speed > 1.5) {
-      startPrediction();
-    }
+    if (lastPoint && lastPoint.speed > 1.5) startPrediction();
     return;
   }
-
   isAnimating = true;
   stopPrediction();
 
@@ -182,8 +114,8 @@ function processQueue() {
 
   const timeDiff = to.updatedAt - from.updatedAt;
   const duration = Math.min(Math.max(timeDiff, 500), 3000);
-
   const dist = getDistance(from.lat, from.lng, to.lat, to.lng);
+
   if (dist > 0.5) {
     lastPoint = to;
     if (busMarker) busMarker.setLatLng([to.lat, to.lng]);
@@ -191,25 +123,17 @@ function processQueue() {
     return;
   }
 
-  const startLat  = from.lat;
-  const startLng  = from.lng;
-  const endLat    = to.lat;
-  const endLng    = to.lng;
+  const startLat = from.lat, startLng = from.lng;
+  const endLat = to.lat, endLng = to.lng;
   const startTime = performance.now();
 
   function animate(now) {
-    const elapsed  = now - startTime;
+    const elapsed = now - startTime;
     const progress = Math.min(elapsed / duration, 1);
-
-    const ease = progress < 0.5
-      ? 2 * progress * progress
-      : -1 + (4 - 2 * progress) * progress;
-
+    const ease = progress < 0.5 ? 2*progress*progress : -1+(4-2*progress)*progress;
     const lat = startLat + (endLat - startLat) * ease;
     const lng = startLng + (endLng - startLng) * ease;
-
     if (busMarker) busMarker.setLatLng([lat, lng]);
-
     if (progress < 1) {
       requestAnimationFrame(animate);
     } else {
@@ -217,104 +141,66 @@ function processQueue() {
       processQueue();
     }
   }
-
   requestAnimationFrame(animate);
 }
 
-// ── Predictive movement ───────────────────────────────────────
 function startPrediction() {
   if (!lastPoint || lastPoint.speed < 1.5) return;
   stopPrediction();
-
-  const speedMs    = lastPoint.speed;
+  const speedMs = lastPoint.speed;
   const headingRad = (lastPoint.heading || 0) * Math.PI / 180;
-  let   predLat    = lastPoint.lat;
-  let   predLng    = lastPoint.lng;
-  let   lastTime   = performance.now();
+  let predLat = lastPoint.lat, predLng = lastPoint.lng;
+  let lastTime = performance.now();
 
   function predict(now) {
     const dt = (now - lastTime) / 1000;
     lastTime = now;
-
     const dLat = (speedMs * dt * Math.cos(headingRad)) / 111320;
-    const dLng = (speedMs * dt * Math.sin(headingRad)) /
-                 (111320 * Math.cos(predLat * Math.PI / 180));
-
-    predLat += dLat;
-    predLng += dLng;
-
+    const dLng = (speedMs * dt * Math.sin(headingRad)) / (111320 * Math.cos(predLat * Math.PI / 180));
+    predLat += dLat; predLng += dLng;
     if (busMarker) busMarker.setLatLng([predLat, predLng]);
     predictionId = requestAnimationFrame(predict);
   }
-
   predictionId = requestAnimationFrame(predict);
 }
 
 function stopPrediction() {
-  if (predictionId) {
-    cancelAnimationFrame(predictionId);
-    predictionId = null;
-  }
+  if (predictionId) { cancelAnimationFrame(predictionId); predictionId = null; }
 }
 
-// ── Snap to road ─────────────────────────────────────────────
-async function snapToRoad(lat, lng) {
-  try {
-    const response = await fetch(
-      `https://api.olamaps.io/routing/v1/snapToRoads` +
-      `?points=${lat},${lng}` +
-      `&api_key=${OLA_MAPS_API_KEY}`,
-      { method: 'POST' }
-    );
-    const json = await response.json();
-    if (json.snapped_points && json.snapped_points.length > 0) {
-      return {
-        lat: json.snapped_points[0].location.latitude,
-        lng: json.snapped_points[0].location.longitude,
-      };
-    }
-  } catch (err) {
-    console.log('Snap to road failed:', err);
-  }
-  return { lat, lng };
-}
-
-// ── ETA color ────────────────────────────────────────────────
 function getEtaColor(minutes) {
-  if (minutes < 5)  return '#dc2626';
+  if (minutes < 5) return '#dc2626';
   if (minutes < 10) return '#f59e0b';
   return '#16a34a';
 }
 
-// ── ETA calculation — uses stopIndex from Firebase ───────────
+// ── ETA — uses ONLY stopIndex from Firebase, no recalculation ──
 async function processRoadETA(busLat, busLng, busSpeed, firebaseStopIndex, busKey) {
   try {
     const stops = ROUTE_STOPS[busKey] || [];
     if (stops.length === 0) return;
 
-    // ── Use stopIndex from Firebase directly ─────────────────
-    const nextIdx = (typeof firebaseStopIndex === 'number') ? firebaseStopIndex : 0;
+    const idx = (typeof firebaseStopIndex === 'number') ? firebaseStopIndex : 0;
 
-    // ── All stops passed — arrived ───────────────────────────
-    if (nextIdx >= stops.length) {
+    // Target = the NEXT stop after the current index (matches driver.js exactly)
+    const targetIdx = Math.min(idx + 1, stops.length - 1);
+
+    // Arrived at final destination
+    if (idx >= stops.length - 1) {
       document.getElementById('etaTime').innerText        = '✅';
       document.getElementById('etaDestination').innerText = 'Arrived at destination';
       document.getElementById('etaDist').innerText        = '';
       return;
     }
 
-    const nextStopName  = stops[nextIdx];
+    const nextStopName  = stops[targetIdx];
     const nextStopCoord = STOP_COORDS[nextStopName];
     if (!nextStopCoord) return;
 
-    // ── Haversine distance to next stop ──────────────────────
-    const distKm = getDistance(busLat, busLng, nextStopCoord.lat, nextStopCoord.lng);
-
-    // ── Speed — use real or fallback 25 km/h ─────────────────
-    const speedMs  = (busSpeed && busSpeed > 0.5) ? busSpeed : CITY_DEFAULT_SPEED_MS;
+    const distKm  = getDistance(busLat, busLng, nextStopCoord.lat, nextStopCoord.lng);
+    const speedMs = (busSpeed && busSpeed > 0.5) ? busSpeed : CITY_DEFAULT_SPEED_MS;
     const speedKmh = speedMs * 3.6;
 
-    // ── ETA — try Ola Maps first ──────────────────────────────
     let etaMinutes = null;
     let roadDistKm = distKm;
 
@@ -323,25 +209,20 @@ async function processRoadETA(busLat, busLng, busSpeed, firebaseStopIndex, busKe
         `https://api.olamaps.io/routing/v1/directions` +
         `?origin=${busLat},${busLng}` +
         `&destination=${nextStopCoord.lat},${nextStopCoord.lng}` +
-        `&overview=full` +
-        `&api_key=${OLA_MAPS_API_KEY}`,
+        `&overview=full&api_key=${OLA_MAPS_API_KEY}`,
         { method: 'POST' }
       );
       const json = await response.json();
-
       if (json.status === 'SUCCESS' && json.routes && json.routes.length > 0) {
         const leg = json.routes[0].legs.find(l => l != null);
         if (leg) {
-          const roadDist = leg.distance?.value ?? leg.distance_meters ??
-            (typeof leg.distance === 'number' ? leg.distance : 0);
-          const roadDur  = leg.duration?.value ?? leg.duration_seconds ??
-            (typeof leg.duration === 'number' ? leg.duration : 0);
-
+          const roadDist = leg.distance?.value ?? leg.distance_meters ?? 0;
+          const roadDur  = leg.duration?.value ?? leg.duration_seconds ?? 0;
           if (roadDist && roadDur) {
-            roadDistKm     = roadDist / 1000;
+            roadDistKm = roadDist / 1000;
             const olaSpeed = roadDist / roadDur;
-            const ratio    = olaSpeed / speedMs;
-            etaMinutes     = Math.max(1, Math.round((roadDur * ratio * ETA_TRAFFIC_BUFFER) / 60));
+            const ratio = olaSpeed / speedMs;
+            etaMinutes = Math.max(1, Math.round((roadDur * ratio * ETA_TRAFFIC_BUFFER) / 60));
           }
         }
       }
@@ -349,16 +230,12 @@ async function processRoadETA(busLat, busLng, busSpeed, firebaseStopIndex, busKe
       console.log('Ola Maps failed, using haversine');
     }
 
-    // ── Fallback haversine ETA ────────────────────────────────
     if (!etaMinutes) {
       etaMinutes = Math.max(1, Math.round((distKm / speedKmh) * 60));
     }
 
-    // ── Stopped bus ───────────────────────────────────────────
-    const isStopped = speedHistory.length >= 3 &&
-                      speedHistory.every(s => s < 0.5);
+    const isStopped = speedHistory.length >= 3 && speedHistory.every(s => s < 0.5);
 
-    // ── Update ETA card ───────────────────────────────────────
     const etaEl  = document.getElementById('etaTime');
     const destEl = document.getElementById('etaDestination');
     const distEl = document.getElementById('etaDist');
@@ -375,7 +252,6 @@ async function processRoadETA(busLat, busLng, busSpeed, firebaseStopIndex, busKe
   }
 }
 
-// ── Bus selection ────────────────────────────────────────────
 window.selectBus = function () {
   const busKey = document.getElementById('busSelect').value;
   if (!busKey) return;
@@ -386,7 +262,6 @@ window.selectBus = function () {
 
   currentBusKey   = busKey;
   speedHistory    = [];
-  routeStopIndex  = 0;
   lastPoint       = null;
   gpsQueue.length = 0;
   stopPrediction();
@@ -403,7 +278,6 @@ window.selectBus = function () {
   dbListenerRef = db.ref('liveLocation/' + busKey).on('value', snap => {
     const data = snap.val();
 
-    // ── Stale check ──────────────────────────────────────────
     if (data && data.updatedAt) {
       const ageHours = (Date.now() - data.updatedAt) / (1000 * 60 * 60);
       if (ageHours > SHIFT_END_CLEANUP_HOURS) {
@@ -412,7 +286,6 @@ window.selectBus = function () {
       }
     }
 
-    // ── Bus offline ──────────────────────────────────────────
     if (!data || !data.lat || !data.lng) {
       document.getElementById('info').innerText        = '🔴 Bus is currently OFFLINE';
       document.getElementById('etaCard').style.display = 'none';
@@ -424,43 +297,32 @@ window.selectBus = function () {
       return;
     }
 
-    // ── Create marker ────────────────────────────────────────
     if (!busMarker) {
       busMarker = L.marker([data.lat, data.lng], {
-        icon:         updateBusIcon(),
-        zIndexOffset: 1000,
+        icon: updateBusIcon(), zIndexOffset: 1000,
       }).addTo(map);
       map.setView([data.lat, data.lng], 15);
     }
 
-    // ── Speed history ─────────────────────────────────────────
     const rawSpeed = (typeof data.speed === 'number' && data.speed > 0.5) ? data.speed : null;
     if (rawSpeed !== null) {
       speedHistory.push(rawSpeed);
       if (speedHistory.length > SPEED_BUFFER_SIZE) speedHistory.shift();
     }
 
-    // ── Snap to road then animate ─────────────────────────────
-    snapToRoad(data.lat, data.lng).then(snapped => {
-      enqueuePoint({
-        lat:       snapped.lat,
-        lng:       snapped.lng,
-        speed:     data.speed   || 0,
-        heading:   data.heading || 0,
-        updatedAt: data.updatedAt || Date.now(),
-      });
+    enqueuePoint({
+      lat: data.lat, lng: data.lng,
+      speed: data.speed || 0, heading: data.heading || 0,
+      updatedAt: data.updatedAt || Date.now(),
     });
 
-    // ── Update UI ─────────────────────────────────────────────
     document.getElementById('info').innerText        = '🟢 Link Connection Active';
     document.getElementById('etaCard').style.display = 'block';
 
-    // ── ETA using stopIndex from Firebase ────────────────────
     processRoadETA(data.lat, data.lng, data.speed, data.stopIndex, busKey);
   });
 };
 
-// ── Topbar toggle ────────────────────────────────────────────
 window.toggleTopbar = function () {
   const topbar = document.getElementById('topbar');
   const btn    = document.getElementById('togglePanelBtn');
