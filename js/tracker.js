@@ -79,16 +79,23 @@ function plotRouteStops(busKey) {
 function updateBusIcon() {
   return L.divIcon({
     className: '',
-    html: `<div style="font-size:30px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4));">🚌</div>`,
-    iconSize: [30, 30], iconAnchor: [15, 15],
+    html: `
+      <div style="position:relative; width:30px; height:45px;">
+        <svg width="30" height="45" viewBox="0 0 24 36" xmlns="http://www.w3.org/2000/svg"
+             style="position:absolute; top:0; left:0; filter:drop-shadow(0 2px 3px rgba(0,0,0,0.45));">
+          <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z" fill="#dc2626"/>
+          <circle cx="12" cy="12" r="9" fill="#ffffff"/>
+          <g transform="translate(5,5) scale(0.6)">
+            <path d="M4 16c0 .88.39 1.67 1 2.22V20c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h8v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM18 11H6V6h12v5z" fill="#1a73e8"/>
+          </g>
+        </svg>
+      </div>
+    `,
+    iconSize: [30, 45], iconAnchor: [15, 44],
   });
 }
 
 function enqueuePoint(point) {
-  if (lastPoint) {
-    const dist = getDistance(lastPoint.lat, lastPoint.lng, point.lat, point.lng);
-    if (dist > 0.2 && point.speed < 5) return;
-  }
   gpsQueue.push(point);
   if (!isAnimating) processQueue();
 }
@@ -147,12 +154,19 @@ function processQueue() {
 function startPrediction() {
   if (!lastPoint || lastPoint.speed < 1.5) return;
   stopPrediction();
+
+  const MAX_PREDICTION_MS = 5000;
+  const predStart = performance.now();
   const speedMs = lastPoint.speed;
   const headingRad = (lastPoint.heading || 0) * Math.PI / 180;
   let predLat = lastPoint.lat, predLng = lastPoint.lng;
   let lastTime = performance.now();
 
   function predict(now) {
+    if (now - predStart > MAX_PREDICTION_MS) {
+      predictionId = null;
+      return;
+    }
     const dt = (now - lastTime) / 1000;
     lastTime = now;
     const dLat = (speedMs * dt * Math.cos(headingRad)) / 111320;
@@ -174,19 +188,18 @@ function getEtaColor(minutes) {
   return '#16a34a';
 }
 
-// ── ETA — uses ONLY stopIndex from Firebase, no recalculation ──
+// ── ETA — stopIndex from Firebase = last CONFIRMED PASSED stop.
+// Next target is therefore stopIndex + 1. This matches driver.js exactly
+// and is the convention proven correct by real GPS testing. ──
 async function processRoadETA(busLat, busLng, busSpeed, firebaseStopIndex, busKey) {
   try {
     const stops = ROUTE_STOPS[busKey] || [];
     if (stops.length === 0) return;
 
-    const idx = (typeof firebaseStopIndex === 'number') ? firebaseStopIndex : 0;
+    const passedIdx = (typeof firebaseStopIndex === 'number') ? firebaseStopIndex : 0;
+    const targetIdx = Math.min(passedIdx + 1, stops.length - 1);
 
-    // Target = the NEXT stop after the current index (matches driver.js exactly)
-    const targetIdx = Math.min(idx + 1, stops.length - 1);
-
-    // Arrived at final destination
-    if (idx >= stops.length - 1) {
+    if (passedIdx >= stops.length - 1) {
       document.getElementById('etaTime').innerText        = '✅';
       document.getElementById('etaDestination').innerText = 'Arrived at destination';
       document.getElementById('etaDist').innerText        = '';
