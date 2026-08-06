@@ -50,7 +50,6 @@ const STOP_COORDS = {
   "Ramdev":                   { lat: 15.878547851761866, lng: 74.51578001515573 },
 
   // ── Hanuman Nagar / Sadashiv Nagar area ─────────────────────
-  "Hindalga Ganesh Temple":   { lat: 15.868964004747033, lng: 74.48942158165639 },
   "Kuvempu Nagar":            { lat: 15.874813628415831, lng: 74.4914875069715  },
   "KLE School":               { lat: 15.879464938336959, lng: 74.4849004606231  },
   "Sahaydri Nagar":           { lat: 15.88140981084143,  lng: 74.4854294948751  },
@@ -186,6 +185,6 @@ const STOP_COORDS = {
   "Basavan Temple":           { lat: 15.8932,            lng: 74.5185            },
   "Ladies Hostel":            { lat: 15.8900,            lng: 74.5030            },
   "Laxmi complex":            { lat: 15.8711,            lng: 74.5122            },
-  "Zudio Mall":               { lat: 15.8719,            lng: 74.5161            }
-
+  "Zudio Mall":               { lat: 15.8719,            lng: 74.5161            },
+   "Ganesh Temple":           { lat: 15.8752,          lng: 74.5126              }
 };
