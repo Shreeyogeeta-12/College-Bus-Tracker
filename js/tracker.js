@@ -4,8 +4,7 @@
 
 let map, busMarker, dbListenerRef;
 let currentBusKey = null;
-let speedHistory  = [];
-
+let speedHistory  = [];     
 const gpsQueue   = [];
 let isAnimating  = false;
 let lastPoint    = null;
@@ -103,7 +102,6 @@ function enqueuePoint(point) {
 function processQueue() {
   if (gpsQueue.length === 0) {
     isAnimating = false;
-    if (lastPoint && lastPoint.speed > 1.5) startPrediction();
     return;
   }
   isAnimating = true;
