@@ -186,5 +186,5 @@ const STOP_COORDS = {
   "Ladies Hostel":            { lat: 15.8900,            lng: 74.5030            },
   "Laxmi complex":            { lat: 15.8711,            lng: 74.5122            },
   "Zudio Mall":               { lat: 15.8719,            lng: 74.5161            },
-   "Ganesh Temple":           { lat: 15.8752,          lng: 74.5126              }
+  "Ganesh Temple":           { lat: 15.8752,            lng: 74.5126            },
 };
