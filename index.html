@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <!-- App styles -->
   <link rel="stylesheet" href="css/common.css"/>
-  <link rel="stylesheet" href="css/tracker.css"/>
+  <link rel="stylesheet" href="js/css/tracker.css"/>
 
   <!-- PWA -->
   <link rel="manifest" href="manifest.json"/>
@@ -46,19 +46,15 @@
 
     <div id="info">Please select a tracking target.</div>
     <div id="driverInfo"></div>
-    <div id="etaLine" style="font-size:13px; margin-top:4px; font-weight:500;"></div>
+  </div>
+
+  <!-- ── Standalone ETA line — stays visible even when topbar is collapsed ── -->
+  <div id="etaLineWrap">
+    <div id="etaLine"></div>
   </div>
 
   <!-- ── Map ──────────────────────────────────────────────── -->
   <div id="map"></div>
-
-  <!-- ── ETA card ─────────────────────────────────────────── -->
-  <div id="etaCard">
-    <div class="eta-label">ETA TO DESTINATION</div>
-    <div><span class="eta-time" id="etaTime">--</span><span class="eta-unit">min</span></div>
-    <div class="eta-destination" id="etaDestination">Calculating...</div>
-    <div class="eta-dist" id="etaDist">-- km remaining</div>
-  </div>
 
   <!-- ── External libraries (order matters) ───────────────── -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
