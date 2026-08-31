@@ -101,12 +101,12 @@ body { overflow: hidden; background: #f4f6f9; }
 #info       { font-size: 11px; font-weight: 600; color: #222; }
 #driverInfo { font-size: 10px; color: #666; margin-top: 1px; }
 
-/* ── ETA card ───────────────────────────────────────────────── */
+/* ── ETA card — MOVED TO TOP (was bottom: 16px) ──────────────── */
 #etaCard {
   position: absolute;
-  bottom: 16px;
-  right: 50%;
-  transform: translateX(50%);
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
   width: 260px;
   z-index: 1000;
   background: white;
