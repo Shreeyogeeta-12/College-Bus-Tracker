@@ -27,18 +27,6 @@ L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
 
 const routeMarkersGroup = L.layerGroup().addTo(map);
 
-L.circleMarker([CAMPUS_LOCATION.lat, CAMPUS_LOCATION.lng], {
-  radius: 8, color: '#ffffff', weight: 2, fillColor: '#dc2626', fillOpacity: 1,
-}).addTo(map);
-
-L.marker([CAMPUS_LOCATION.lat, CAMPUS_LOCATION.lng], {
-  icon: L.divIcon({
-    className: 'google-stop-label',
-    html: `<span class="stop-text-pill" style="color:#dc2626 !important; border-color:#dc2626;">📍 KLS GIT Campus</span>`,
-    iconAnchor: [45, 0],
-  }),
-}).addTo(map);
-
 window.onShiftChange = function () {
   const shift     = document.getElementById('shiftSelect').value;
   const busSelect = document.getElementById('busSelect');
