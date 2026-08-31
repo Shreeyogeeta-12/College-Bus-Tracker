@@ -4,6 +4,7 @@
 
 let map, busMarker, dbListenerRef;
 let currentBusKey = null;
+let currentShift  = null;
 let speedHistory  = [];
 const gpsQueue   = [];
 let isAnimating  = false;
@@ -186,27 +187,50 @@ function getEtaColor(minutes) {
   return '#16a34a';
 }
 
-// ── ETA — writes into the TOP card (#etaLine), not a separate bottom card ──
+// ── ETA — writes into the TOP card (#etaLine) ──
+// Morning shifts (7:30 AM / 9:00 AM) always target the final destination
+// (KLS GIT Campus) directly, regardless of which pickup stop the bus is
+// currently near. Drop shifts still route stop-by-stop to the student's
+// drop-off point, since that's the actual destination for those routes.
 async function processRoadETA(busLat, busLng, busSpeed, firebaseStopIndex, busKey) {
   try {
-    const stops = ROUTE_STOPS[busKey] || [];
     const etaLineEl = document.getElementById('etaLine');
-    if (stops.length === 0 || !etaLineEl) return;
+    if (!etaLineEl) return;
 
-    const passedIdx = (typeof firebaseStopIndex === 'number') ? firebaseStopIndex : 0;
-    const targetIdx = Math.min(passedIdx + 1, stops.length - 1);
+    const isMorningShift = !!currentShift && currentShift.indexOf('morning') === 0;
 
-    if (passedIdx >= stops.length - 1) {
-      etaLineEl.innerHTML = `✅ <b>Arrived at destination</b>`;
-      etaLineEl.style.color = '#16a34a';
-      return;
+    let targetName, targetCoord;
+
+    if (isMorningShift) {
+      // Destination is always campus for morning pickup shifts.
+      targetName  = 'KLS GIT Campus';
+      targetCoord = CAMPUS_LOCATION;
+
+      const arrivalDistKm = getDistance(busLat, busLng, targetCoord.lat, targetCoord.lng);
+      if (arrivalDistKm < 0.3) {
+        etaLineEl.innerHTML = `✅ <b>Arrived at destination</b>`;
+        etaLineEl.style.color = '#16a34a';
+        return;
+      }
+    } else {
+      const stops = ROUTE_STOPS[busKey] || [];
+      if (stops.length === 0) return;
+
+      const passedIdx = (typeof firebaseStopIndex === 'number') ? firebaseStopIndex : 0;
+      const targetIdx = Math.min(passedIdx + 1, stops.length - 1);
+
+      if (passedIdx >= stops.length - 1) {
+        etaLineEl.innerHTML = `✅ <b>Arrived at destination</b>`;
+        etaLineEl.style.color = '#16a34a';
+        return;
+      }
+
+      targetName  = stops[targetIdx];
+      targetCoord = STOP_COORDS[targetName];
+      if (!targetCoord) return;
     }
 
-    const nextStopName  = stops[targetIdx];
-    const nextStopCoord = STOP_COORDS[nextStopName];
-    if (!nextStopCoord) return;
-
-    const distKm  = getDistance(busLat, busLng, nextStopCoord.lat, nextStopCoord.lng);
+    const distKm  = getDistance(busLat, busLng, targetCoord.lat, targetCoord.lng);
     const speedMs = (busSpeed && busSpeed > 0.5) ? busSpeed : CITY_DEFAULT_SPEED_MS;
     const speedKmh = speedMs * 3.6;
 
@@ -217,7 +241,7 @@ async function processRoadETA(busLat, busLng, busSpeed, firebaseStopIndex, busKe
       const response = await fetch(
         `https://api.olamaps.io/routing/v1/directions` +
         `?origin=${busLat},${busLng}` +
-        `&destination=${nextStopCoord.lat},${nextStopCoord.lng}` +
+        `&destination=${targetCoord.lat},${targetCoord.lng}` +
         `&overview=full&api_key=${OLA_MAPS_API_KEY}`,
         { method: 'POST' }
       );
@@ -247,9 +271,8 @@ async function processRoadETA(busLat, busLng, busSpeed, firebaseStopIndex, busKe
     const etaColor  = getEtaColor(etaMinutes);
     const etaLabel  = isStopped ? '~' + etaMinutes : String(etaMinutes);
 
-    // ── Single compact line, matching the reference layout ──
     etaLineEl.innerHTML =
-      `⏱ ETA to <b>${nextStopName}</b>: ` +
+      `⏱ ETA to <b>${targetName}</b>: ` +
       `<span style="color:${etaColor}; font-weight:700;">${etaLabel} min</span>` +
       ` &nbsp;·&nbsp; ${roadDistKm.toFixed(1)} km` +
       (isStopped ? ` <span style="color:#888;">(bus may be stopped)</span>` : '');
@@ -268,6 +291,7 @@ window.selectBus = function () {
   }
 
   currentBusKey   = busKey;
+  currentShift    = document.getElementById('shiftSelect').value;
   speedHistory    = [];
   lastPoint       = null;
   gpsQueue.length = 0;
