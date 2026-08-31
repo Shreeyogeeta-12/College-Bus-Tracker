@@ -4,7 +4,7 @@
 
 let map, busMarker, dbListenerRef;
 let currentBusKey = null;
-let speedHistory  = [];     
+let speedHistory  = [];
 const gpsQueue   = [];
 let isAnimating  = false;
 let lastPoint    = null;
@@ -186,21 +186,19 @@ function getEtaColor(minutes) {
   return '#16a34a';
 }
 
-// ── ETA — stopIndex from Firebase = last CONFIRMED PASSED stop.
-// Next target is therefore stopIndex + 1. This matches driver.js exactly
-// and is the convention proven correct by real GPS testing. ──
+// ── ETA — writes into the TOP card (#etaLine), not a separate bottom card ──
 async function processRoadETA(busLat, busLng, busSpeed, firebaseStopIndex, busKey) {
   try {
     const stops = ROUTE_STOPS[busKey] || [];
-    if (stops.length === 0) return;
+    const etaLineEl = document.getElementById('etaLine');
+    if (stops.length === 0 || !etaLineEl) return;
 
     const passedIdx = (typeof firebaseStopIndex === 'number') ? firebaseStopIndex : 0;
     const targetIdx = Math.min(passedIdx + 1, stops.length - 1);
 
     if (passedIdx >= stops.length - 1) {
-      document.getElementById('etaTime').innerText        = '✅';
-      document.getElementById('etaDestination').innerText = 'Arrived at destination';
-      document.getElementById('etaDist').innerText        = '';
+      etaLineEl.innerHTML = `✅ <b>Arrived at destination</b>`;
+      etaLineEl.style.color = '#16a34a';
       return;
     }
 
@@ -246,17 +244,15 @@ async function processRoadETA(busLat, busLng, busSpeed, firebaseStopIndex, busKe
     }
 
     const isStopped = speedHistory.length >= 3 && speedHistory.every(s => s < 0.5);
+    const etaColor  = getEtaColor(etaMinutes);
+    const etaLabel  = isStopped ? '~' + etaMinutes : String(etaMinutes);
 
-    const etaEl  = document.getElementById('etaTime');
-    const destEl = document.getElementById('etaDestination');
-    const distEl = document.getElementById('etaDist');
-
-    etaEl.innerText   = isStopped ? '~' + etaMinutes : String(etaMinutes);
-    etaEl.style.color = getEtaColor(etaMinutes);
-    destEl.innerText  = `Next Stop: ${nextStopName}`;
-    distEl.innerText  = isStopped
-      ? `${roadDistKm.toFixed(1)} km — Bus may be stopped`
-      : `${roadDistKm.toFixed(1)} km away`;
+    // ── Single compact line, matching the reference layout ──
+    etaLineEl.innerHTML =
+      `⏱ ETA to <b>${nextStopName}</b>: ` +
+      `<span style="color:${etaColor}; font-weight:700;">${etaLabel} min</span>` +
+      ` &nbsp;·&nbsp; ${roadDistKm.toFixed(1)} km` +
+      (isStopped ? ` <span style="color:#888;">(bus may be stopped)</span>` : '');
 
   } catch (err) {
     console.error('ETA error:', err);
@@ -281,6 +277,9 @@ window.selectBus = function () {
   document.getElementById('driverInfo').innerText =
     `Driver: ${DRIVER_DB[busKey] || 'Assigned Duty Driver'}`;
 
+  const etaLineEl = document.getElementById('etaLine');
+  if (etaLineEl) { etaLineEl.innerText = ''; etaLineEl.style.color = ''; }
+
   plotRouteStops(busKey);
 
   if (busMarker) map.removeLayer(busMarker);
@@ -298,8 +297,8 @@ window.selectBus = function () {
     }
 
     if (!data || !data.lat || !data.lng) {
-      document.getElementById('info').innerText        = '🔴 Bus is currently OFFLINE';
-      document.getElementById('etaCard').style.display = 'none';
+      document.getElementById('info').innerText = '🔴 Bus is currently OFFLINE';
+      if (etaLineEl) etaLineEl.innerText = '';
       if (busMarker) map.removeLayer(busMarker);
       busMarker       = null;
       lastPoint       = null;
@@ -327,8 +326,7 @@ window.selectBus = function () {
       updatedAt: data.updatedAt || Date.now(),
     });
 
-    document.getElementById('info').innerText        = '🟢 Link Connection Active';
-    document.getElementById('etaCard').style.display = 'block';
+    document.getElementById('info').innerText = '🟢 Link Connection Active';
 
     processRoadETA(data.lat, data.lng, data.speed, data.stopIndex, busKey);
   });
