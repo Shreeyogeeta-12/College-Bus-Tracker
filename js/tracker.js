@@ -83,14 +83,30 @@ function updateBusIcon() {
   });
 }
 
+// ── Shared dead-reckoning math ──
+// Given a lat/lng, speed (m/s) and heading (degrees), returns the position
+// after `seconds` of travel in a straight line. Used both to compensate for
+// network/GPS latency on incoming fixes, and to keep the marker gliding
+// forward while waiting for the next fix.
+function extrapolateLatLng(lat, lng, speedMs, headingDeg, seconds) {
+  const headingRad = (headingDeg || 0) * Math.PI / 180;
+  const dLat = (speedMs * seconds * Math.cos(headingRad)) / 111320;
+  const dLng = (speedMs * seconds * Math.sin(headingRad)) / (111320 * Math.cos(lat * Math.PI / 180));
+  return { lat: lat + dLat, lng: lng + dLng };
+}
+
 function enqueuePoint(point) {
   gpsQueue.push(point);
   if (!isAnimating) processQueue();
 }
 
+// ── Smooth interpolation between real GPS fixes ──
+// When the queue drains (no new fix waiting), hand off to startPrediction()
+// instead of freezing the marker, so it keeps advancing between updates.
 function processQueue() {
   if (gpsQueue.length === 0) {
     isAnimating = false;
+    startPrediction();
     return;
   }
   isAnimating = true;
@@ -98,6 +114,11 @@ function processQueue() {
 
   const from = lastPoint;
   const to   = gpsQueue.shift();
+
+  // Tween from wherever the marker is actually sitting right now (which may
+  // be a predicted position), not from the last stored real fix — avoids a
+  // visible backward snap when real data lands.
+  const currentPos = busMarker ? busMarker.getLatLng() : null;
 
   if (!from) {
     lastPoint = to;
@@ -107,7 +128,7 @@ function processQueue() {
   }
 
   const timeDiff = to.updatedAt - from.updatedAt;
-  const duration = Math.min(Math.max(timeDiff, 500), 3000);
+  const duration = Math.min(Math.max(timeDiff, 400), 2500);
   const dist = getDistance(from.lat, from.lng, to.lat, to.lng);
 
   if (dist > 0.5) {
@@ -117,14 +138,18 @@ function processQueue() {
     return;
   }
 
-  const startLat = from.lat, startLng = from.lng;
+  const startLat = currentPos ? currentPos.lat : from.lat;
+  const startLng = currentPos ? currentPos.lng : from.lng;
   const endLat = to.lat, endLng = to.lng;
   const startTime = performance.now();
 
   function animate(now) {
     const elapsed = now - startTime;
     const progress = Math.min(elapsed / duration, 1);
-    const ease = progress < 0.5 ? 2*progress*progress : -1+(4-2*progress)*progress;
+    // Cubic ease-in-out — smoother "crawl" than a linear/quad tween.
+    const ease = progress < 0.5
+      ? 4 * progress * progress * progress
+      : 1 - Math.pow(-2 * progress + 2, 3) / 2;
     const lat = startLat + (endLat - startLat) * ease;
     const lng = startLng + (endLng - startLng) * ease;
     if (busMarker) busMarker.setLatLng([lat, lng]);
@@ -138,14 +163,18 @@ function processQueue() {
   requestAnimationFrame(animate);
 }
 
+// ── Dead-reckoning prediction ──
+// Runs while waiting for the next real GPS fix, extrapolating position
+// forward from last known speed + heading so the marker keeps advancing
+// in real time instead of sitting still between updates.
 function startPrediction() {
   if (!lastPoint || lastPoint.speed < 1.5) return;
   stopPrediction();
 
-  const MAX_PREDICTION_MS = 5000;
+  const MAX_PREDICTION_MS = 8000;
   const predStart = performance.now();
   const speedMs = lastPoint.speed;
-  const headingRad = (lastPoint.heading || 0) * Math.PI / 180;
+  const headingDeg = lastPoint.heading || 0;
   let predLat = lastPoint.lat, predLng = lastPoint.lng;
   let lastTime = performance.now();
 
@@ -156,9 +185,8 @@ function startPrediction() {
     }
     const dt = (now - lastTime) / 1000;
     lastTime = now;
-    const dLat = (speedMs * dt * Math.cos(headingRad)) / 111320;
-    const dLng = (speedMs * dt * Math.sin(headingRad)) / (111320 * Math.cos(predLat * Math.PI / 180));
-    predLat += dLat; predLng += dLng;
+    const next = extrapolateLatLng(predLat, predLng, speedMs, headingDeg, dt);
+    predLat = next.lat; predLng = next.lng;
     if (busMarker) busMarker.setLatLng([predLat, predLng]);
     predictionId = requestAnimationFrame(predict);
   }
@@ -190,7 +218,6 @@ async function processRoadETA(busLat, busLng, busSpeed, firebaseStopIndex, busKe
     let targetName, targetCoord;
 
     if (isMorningShift) {
-      // Destination is always campus for morning pickup shifts.
       targetName  = 'KLS GIT Campus';
       targetCoord = CAMPUS_LOCATION;
 
@@ -332,10 +359,25 @@ window.selectBus = function () {
       if (speedHistory.length > SPEED_BUFFER_SIZE) speedHistory.shift();
     }
 
+    // ── Latency compensation ──
+    // The fix left the driver's phone at data.updatedAt but only reaches us
+    // now, after network + write delay. Push it forward by that gap using
+    // the reported speed/heading, so the marker reflects where the bus
+    // actually is right now instead of where it was a moment ago.
+    const rawUpdatedAt = data.updatedAt || Date.now();
+    const latencySec = Math.min(Math.max((Date.now() - rawUpdatedAt) / 1000, 0), 8);
+    let pointLat = data.lat, pointLng = data.lng;
+
+    if ((data.speed || 0) > 1.5 && latencySec > 0.3) {
+      const compensated = extrapolateLatLng(pointLat, pointLng, data.speed, data.heading || 0, latencySec);
+      pointLat = compensated.lat;
+      pointLng = compensated.lng;
+    }
+
     enqueuePoint({
-      lat: data.lat, lng: data.lng,
+      lat: pointLat, lng: pointLng,
       speed: data.speed || 0, heading: data.heading || 0,
-      updatedAt: data.updatedAt || Date.now(),
+      updatedAt: rawUpdatedAt,
     });
 
     document.getElementById('info').innerText = '🟢 Link Connection Active';
