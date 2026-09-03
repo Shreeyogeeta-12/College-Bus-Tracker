@@ -2,26 +2,39 @@
    tracker.js — Student-facing bus tracker logic
    ============================================================ */
 
+// ── State ────────────────────────────────────────────────────
 let map, busMarker, dbListenerRef;
-let currentBusKey = null;
-let currentShift  = null;
-let speedHistory  = [];
-const gpsQueue   = [];
-let isAnimating  = false;
-let lastPoint    = null;
-let predictionId = null;
+let currentBusKey  = null;
+let speedHistory   = [];
+let routeStopIndex = 0;
 
-const MAX_PREDICTION_DIST_M = 80;   // hard cap — prediction can never drift more than this from last real fix
-const MAX_ACCURACY_M        = 50;   // skip prediction/latency-comp if GPS fix is this noisy or worse
+// ── GPS Queue System ─────────────────────────────────────────
+const gpsQueue     = [];
+let isAnimating    = false;
+let lastPoint      = null;
+let predictionId   = null;
+let snapRequestId  = 0;   // guards against out-of-order snapToRoad responses
+let lastFixTime    = 0;   // last Firebase updatedAt actually accepted
 
+const MAX_PREDICTION_MS     = 5000; // freeze marker after 5s without a real update
+const MAX_PREDICTION_DIST_M = 60;   // dead-reckoning can never drift more than this
+const MAX_SNAP_DEVIATION_M  = 60;   // discard a snap-to-road result that's implausibly far from the raw GPS fix
+const MAX_IMPLIED_SPEED_MS  = 35;   // ~126 km/h — reject GPS points that imply teleportation
+
+// ── Map setup ────────────────────────────────────────────────
 const belagaviBounds = L.latLngBounds(
   L.latLng(BELAGAVI_BOUNDS[0][0], BELAGAVI_BOUNDS[0][1]),
   L.latLng(BELAGAVI_BOUNDS[1][0], BELAGAVI_BOUNDS[1][1])
 );
 
 map = L.map('map', {
-  center: [15.8500, 74.5100], zoom: 13, minZoom: 10, maxZoom: 18,
-  maxBounds: belagaviBounds, maxBoundsViscosity: 1.0, zoomControl: false,
+  center:              [15.8500, 74.5100],
+  zoom:                13,
+  minZoom:             10,
+  maxZoom:             18,
+  maxBounds:           belagaviBounds,
+  maxBoundsViscosity:  1.0,
+  zoomControl:         false,
 });
 
 L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
@@ -30,19 +43,34 @@ L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
 
 const routeMarkersGroup = L.layerGroup().addTo(map);
 
+// Campus pin
+L.circleMarker([CAMPUS_LOCATION.lat, CAMPUS_LOCATION.lng], {
+  radius: 8, color: '#ffffff', weight: 2, fillColor: '#dc2626', fillOpacity: 1,
+}).addTo(map);
+
+L.marker([CAMPUS_LOCATION.lat, CAMPUS_LOCATION.lng], {
+  icon: L.divIcon({
+    className: 'google-stop-label',
+    html: `<span class="stop-text-pill" style="color:#dc2626 !important; border-color:#dc2626;">📍 KLS GIT Campus</span>`,
+    iconAnchor: [45, 0],
+  }),
+}).addTo(map);
+
+// ── Shift dropdown ───────────────────────────────────────────
 window.onShiftChange = function () {
   const shift     = document.getElementById('shiftSelect').value;
   const busSelect = document.getElementById('busSelect');
   busSelect.innerHTML = '<option value="">-- Choose Bus --</option>';
   if (!shift) return;
   SHIFT_BUSES[shift].forEach(bus => {
-    const opt = document.createElement('option');
-    opt.value = bus.id;
+    const opt       = document.createElement('option');
+    opt.value       = bus.id;
     opt.textContent = bus.label;
     busSelect.appendChild(opt);
   });
 };
 
+// ── Draw route stops ─────────────────────────────────────────
 function plotRouteStops(busKey) {
   setTimeout(() => {
     document.getElementById('topbar').classList.add('collapsed');
@@ -67,6 +95,7 @@ function plotRouteStops(busKey) {
   });
 }
 
+// ── Bus icon — red teardrop pin, SVG bus ──
 function updateBusIcon() {
   return L.divIcon({
     className: '',
@@ -82,23 +111,15 @@ function updateBusIcon() {
         </svg>
       </div>
     `,
-    iconSize: [30, 45], iconAnchor: [15, 44],
+    iconSize:   [30, 45],
+    iconAnchor: [15, 44],
   });
 }
 
-function extrapolateLatLng(lat, lng, speedMs, headingDeg, seconds) {
-  const headingRad = (headingDeg || 0) * Math.PI / 180;
-  const dLat = (speedMs * seconds * Math.cos(headingRad)) / 111320;
-  const dLng = (speedMs * seconds * Math.sin(headingRad)) / (111320 * Math.cos(lat * Math.PI / 180));
-  return { lat: lat + dLat, lng: lng + dLng };
-}
-
-// Clamp an extrapolated point so it can never sit more than MAX_PREDICTION_DIST_M
-// from the anchor (last real GPS fix). This is what stops the marker drifting
-// into a lake or off-road when heading/speed data is noisy.
-function clampToMaxDrift(anchorLat, anchorLng, targetLat, targetLng) {
+// ── Clamp a candidate point so it can never sit more than maxM from anchor ──
+function clampToMaxDrift(anchorLat, anchorLng, targetLat, targetLng, maxM) {
   const driftKm = getDistance(anchorLat, anchorLng, targetLat, targetLng);
-  const maxKm = MAX_PREDICTION_DIST_M / 1000;
+  const maxKm = maxM / 1000;
   if (driftKm <= maxKm) return { lat: targetLat, lng: targetLng };
   const ratio = maxKm / driftKm;
   return {
@@ -107,7 +128,17 @@ function clampToMaxDrift(anchorLat, anchorLng, targetLat, targetLng) {
   };
 }
 
+// ── Queue-based smooth animation ─────────────────────────────
+// Rejects only genuinely implausible GPS teleports (implied speed check),
+// not legitimate slow-moving points — the old filter here used to silently
+// drop valid fixes, which caused freeze/jump artifacts.
 function enqueuePoint(point) {
+  if (lastPoint) {
+    const distKm = getDistance(lastPoint.lat, lastPoint.lng, point.lat, point.lng);
+    const dtSec  = Math.max((point.updatedAt - lastPoint.updatedAt) / 1000, 0.5);
+    const impliedSpeedMs = (distKm * 1000) / dtSec;
+    if (impliedSpeedMs > MAX_IMPLIED_SPEED_MS) return;
+  }
   gpsQueue.push(point);
   if (!isAnimating) processQueue();
 }
@@ -115,9 +146,12 @@ function enqueuePoint(point) {
 function processQueue() {
   if (gpsQueue.length === 0) {
     isAnimating = false;
-    startPrediction();
+    if (lastPoint && lastPoint.speed > 1.5) {
+      startPrediction();
+    }
     return;
   }
+
   isAnimating = true;
   stopPrediction();
 
@@ -134,9 +168,9 @@ function processQueue() {
   }
 
   const timeDiff = to.updatedAt - from.updatedAt;
-  const duration = Math.min(Math.max(timeDiff, 400), 2500);
-  const dist = getDistance(from.lat, from.lng, to.lat, to.lng);
+  const duration = Math.min(Math.max(timeDiff, 500), 3000);
 
+  const dist = getDistance(from.lat, from.lng, to.lat, to.lng);
   if (dist > 0.5) {
     lastPoint = to;
     if (busMarker) busMarker.setLatLng([to.lat, to.lng]);
@@ -144,20 +178,25 @@ function processQueue() {
     return;
   }
 
-  const startLat = currentPos ? currentPos.lat : from.lat;
-  const startLng = currentPos ? currentPos.lng : from.lng;
-  const endLat = to.lat, endLng = to.lng;
+  const startLat  = currentPos ? currentPos.lat : from.lat;
+  const startLng  = currentPos ? currentPos.lng : from.lng;
+  const endLat    = to.lat;
+  const endLng    = to.lng;
   const startTime = performance.now();
 
   function animate(now) {
-    const elapsed = now - startTime;
+    const elapsed  = now - startTime;
     const progress = Math.min(elapsed / duration, 1);
+
     const ease = progress < 0.5
       ? 4 * progress * progress * progress
       : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
     const lat = startLat + (endLat - startLat) * ease;
     const lng = startLng + (endLng - startLng) * ease;
+
     if (busMarker) busMarker.setLatLng([lat, lng]);
+
     if (progress < 1) {
       requestAnimationFrame(animate);
     } else {
@@ -165,90 +204,121 @@ function processQueue() {
       processQueue();
     }
   }
+
   requestAnimationFrame(animate);
 }
 
-// Dead-reckoning prediction — now gated on accuracy and hard-clamped to
-// MAX_PREDICTION_DIST_M from the last real fix, so bad heading/speed data
-// can never send the marker wandering off-road or into water.
+// ── Predictive movement — ONE definition only. Freezes after
+// MAX_PREDICTION_MS without a real fix, and is hard-clamped so it can
+// never drift more than MAX_PREDICTION_DIST_M from the last real point.
+// Never starts at all if the bus's last reported speed is near zero —
+// this is what makes the marker actually stop when the bus stops. ──
 function startPrediction() {
   if (!lastPoint || lastPoint.speed < 1.5) return;
-  if (typeof lastPoint.accuracy === 'number' && lastPoint.accuracy > MAX_ACCURACY_M) return;
   stopPrediction();
 
-  const MAX_PREDICTION_MS = 4000;
-  const anchorLat = lastPoint.lat, anchorLng = lastPoint.lng;
-  const predStart = performance.now();
-  const speedMs = lastPoint.speed;
-  const headingDeg = lastPoint.heading || 0;
-  let predLat = anchorLat, predLng = anchorLng;
-  let lastTime = performance.now();
+  const anchorLat  = lastPoint.lat;
+  const anchorLng  = lastPoint.lng;
+  const predStart  = performance.now();
+  const speedMs    = lastPoint.speed;
+  const headingRad = (lastPoint.heading || 0) * Math.PI / 180;
+  let   predLat    = anchorLat;
+  let   predLng    = anchorLng;
+  let   lastTime   = performance.now();
 
   function predict(now) {
     if (now - predStart > MAX_PREDICTION_MS) {
-      predictionId = null;
+      predictionId = null; // stop — wait for a real GPS fix instead of guessing further
       return;
     }
+
     const dt = (now - lastTime) / 1000;
     lastTime = now;
-    const next = extrapolateLatLng(predLat, predLng, speedMs, headingDeg, dt);
-    const clamped = clampToMaxDrift(anchorLat, anchorLng, next.lat, next.lng);
-    predLat = clamped.lat; predLng = clamped.lng;
+
+    const dLat = (speedMs * dt * Math.cos(headingRad)) / 111320;
+    const dLng = (speedMs * dt * Math.sin(headingRad)) /
+                 (111320 * Math.cos(predLat * Math.PI / 180));
+
+    const nextLat = predLat + dLat;
+    const nextLng = predLng + dLng;
+    const clamped = clampToMaxDrift(anchorLat, anchorLng, nextLat, nextLng, MAX_PREDICTION_DIST_M);
+    predLat = clamped.lat;
+    predLng = clamped.lng;
+
     if (busMarker) busMarker.setLatLng([predLat, predLng]);
     predictionId = requestAnimationFrame(predict);
   }
+
   predictionId = requestAnimationFrame(predict);
 }
 
 function stopPrediction() {
-  if (predictionId) { cancelAnimationFrame(predictionId); predictionId = null; }
+  if (predictionId) {
+    cancelAnimationFrame(predictionId);
+    predictionId = null;
+  }
 }
 
+// ── Snap to road — now sanity-checked. If OLA Maps snaps to a road
+// segment implausibly far from the raw GPS fix (a known cause of the
+// "jumps forward then back" symptom when it briefly mis-snaps to a
+// nearby parallel road), the snap is discarded and the raw fix is used
+// instead. ──
+async function snapToRoad(lat, lng) {
+  try {
+    const response = await fetch(
+      `https://api.olamaps.io/routing/v1/snapToRoads` +
+      `?points=${lat},${lng}` +
+      `&api_key=${OLA_MAPS_API_KEY}`,
+      { method: 'POST' }
+    );
+    const json = await response.json();
+    if (json.snapped_points && json.snapped_points.length > 0) {
+      const snapped = {
+        lat: json.snapped_points[0].location.latitude,
+        lng: json.snapped_points[0].location.longitude,
+      };
+      const deviationKm = getDistance(lat, lng, snapped.lat, snapped.lng);
+      if (deviationKm * 1000 > MAX_SNAP_DEVIATION_M) {
+        return { lat, lng }; // reject implausible snap, use raw fix
+      }
+      return snapped;
+    }
+  } catch (err) {
+    console.log('Snap to road failed:', err);
+  }
+  return { lat, lng };
+}
+
+// ── ETA color ────────────────────────────────────────────────
 function getEtaColor(minutes) {
-  if (minutes < 5) return '#dc2626';
+  if (minutes < 5)  return '#dc2626';
   if (minutes < 10) return '#f59e0b';
   return '#16a34a';
 }
 
+// ── ETA calculation — uses stopIndex from Firebase ───────────
 async function processRoadETA(busLat, busLng, busSpeed, firebaseStopIndex, busKey) {
   try {
-    const etaLineEl = document.getElementById('etaLine');
-    if (!etaLineEl) return;
+    const stops = ROUTE_STOPS[busKey] || [];
+    if (stops.length === 0) return;
 
-    const isMorningShift = !!currentShift && currentShift.indexOf('morning') === 0;
+    const nextIdx = (typeof firebaseStopIndex === 'number') ? firebaseStopIndex : 0;
 
-    let targetName, targetCoord;
-
-    if (isMorningShift) {
-      targetName  = 'KLS GIT Campus';
-      targetCoord = CAMPUS_LOCATION;
-
-      const arrivalDistKm = getDistance(busLat, busLng, targetCoord.lat, targetCoord.lng);
-      if (arrivalDistKm < 0.3) {
-        etaLineEl.innerHTML = `✅ <b>Arrived at destination</b>`;
-        etaLineEl.style.color = '#16a34a';
-        return;
-      }
-    } else {
-      const stops = ROUTE_STOPS[busKey] || [];
-      if (stops.length === 0) return;
-
-      const passedIdx = (typeof firebaseStopIndex === 'number') ? firebaseStopIndex : 0;
-      const targetIdx = Math.min(passedIdx + 1, stops.length - 1);
-
-      if (passedIdx >= stops.length - 1) {
-        etaLineEl.innerHTML = `✅ <b>Arrived at destination</b>`;
-        etaLineEl.style.color = '#16a34a';
-        return;
-      }
-
-      targetName  = stops[targetIdx];
-      targetCoord = STOP_COORDS[targetName];
-      if (!targetCoord) return;
+    if (nextIdx >= stops.length) {
+      document.getElementById('etaTime').innerText        = '✅';
+      document.getElementById('etaDestination').innerText = 'Arrived at destination';
+      document.getElementById('etaDist').innerText        = '';
+      return;
     }
 
-    const distKm  = getDistance(busLat, busLng, targetCoord.lat, targetCoord.lng);
-    const speedMs = (busSpeed && busSpeed > 0.5) ? busSpeed : CITY_DEFAULT_SPEED_MS;
+    const nextStopName  = stops[nextIdx];
+    const nextStopCoord = STOP_COORDS[nextStopName];
+    if (!nextStopCoord) return;
+
+    const distKm = getDistance(busLat, busLng, nextStopCoord.lat, nextStopCoord.lng);
+
+    const speedMs  = (busSpeed && busSpeed > 0.5) ? busSpeed : CITY_DEFAULT_SPEED_MS;
     const speedKmh = speedMs * 3.6;
 
     let etaMinutes = null;
@@ -258,21 +328,26 @@ async function processRoadETA(busLat, busLng, busSpeed, firebaseStopIndex, busKe
       const response = await fetch(
         `https://api.olamaps.io/routing/v1/directions` +
         `?origin=${busLat},${busLng}` +
-        `&destination=${targetCoord.lat},${targetCoord.lng}` +
-        `&overview=full&api_key=${OLA_MAPS_API_KEY}`,
+        `&destination=${nextStopCoord.lat},${nextStopCoord.lng}` +
+        `&overview=full` +
+        `&api_key=${OLA_MAPS_API_KEY}`,
         { method: 'POST' }
       );
       const json = await response.json();
+
       if (json.status === 'SUCCESS' && json.routes && json.routes.length > 0) {
         const leg = json.routes[0].legs.find(l => l != null);
         if (leg) {
-          const roadDist = leg.distance?.value ?? leg.distance_meters ?? 0;
-          const roadDur  = leg.duration?.value ?? leg.duration_seconds ?? 0;
+          const roadDist = leg.distance?.value ?? leg.distance_meters ??
+            (typeof leg.distance === 'number' ? leg.distance : 0);
+          const roadDur  = leg.duration?.value ?? leg.duration_seconds ??
+            (typeof leg.duration === 'number' ? leg.duration : 0);
+
           if (roadDist && roadDur) {
-            roadDistKm = roadDist / 1000;
+            roadDistKm     = roadDist / 1000;
             const olaSpeed = roadDist / roadDur;
-            const ratio = olaSpeed / speedMs;
-            etaMinutes = Math.max(1, Math.round((roadDur * ratio * ETA_TRAFFIC_BUFFER) / 60));
+            const ratio    = olaSpeed / speedMs;
+            etaMinutes     = Math.max(1, Math.round((roadDur * ratio * ETA_TRAFFIC_BUFFER) / 60));
           }
         }
       }
@@ -284,21 +359,26 @@ async function processRoadETA(busLat, busLng, busSpeed, firebaseStopIndex, busKe
       etaMinutes = Math.max(1, Math.round((distKm / speedKmh) * 60));
     }
 
-    const isStopped = speedHistory.length >= 3 && speedHistory.every(s => s < 0.5);
-    const etaColor  = getEtaColor(etaMinutes);
-    const etaLabel  = isStopped ? '~' + etaMinutes : String(etaMinutes);
+    const isStopped = speedHistory.length >= 3 &&
+                      speedHistory.every(s => s < 0.5);
 
-    etaLineEl.innerHTML =
-      `⏱ ETA to <b>${targetName}</b>: ` +
-      `<span style="color:${etaColor}; font-weight:700;">${etaLabel} min</span>` +
-      ` &nbsp;·&nbsp; ${roadDistKm.toFixed(1)} km` +
-      (isStopped ? ` <span style="color:#888;">(bus may be stopped)</span>` : '');
+    const etaEl  = document.getElementById('etaTime');
+    const destEl = document.getElementById('etaDestination');
+    const distEl = document.getElementById('etaDist');
+
+    etaEl.innerText   = isStopped ? '~' + etaMinutes : String(etaMinutes);
+    etaEl.style.color = getEtaColor(etaMinutes);
+    destEl.innerText  = `Next Stop: ${nextStopName}`;
+    distEl.innerText  = isStopped
+      ? `${roadDistKm.toFixed(1)} km — Bus may be stopped`
+      : `${roadDistKm.toFixed(1)} km away`;
 
   } catch (err) {
     console.error('ETA error:', err);
   }
 }
 
+// ── Bus selection ────────────────────────────────────────────
 window.selectBus = function () {
   const busKey = document.getElementById('busSelect').value;
   if (!busKey) return;
@@ -308,18 +388,17 @@ window.selectBus = function () {
   }
 
   currentBusKey   = busKey;
-  currentShift    = document.getElementById('shiftSelect').value;
   speedHistory    = [];
+  routeStopIndex  = 0;
   lastPoint       = null;
   gpsQueue.length = 0;
+  lastFixTime     = 0;
+  snapRequestId++; // invalidate any snap-to-road calls still in flight for the previous bus
   stopPrediction();
 
   document.getElementById('info').innerText = 'Syncing data feed...';
   document.getElementById('driverInfo').innerText =
     `Driver: ${DRIVER_DB[busKey] || 'Assigned Duty Driver'}`;
-
-  const etaLineEl = document.getElementById('etaLine');
-  if (etaLineEl) { etaLineEl.innerText = ''; etaLineEl.style.color = ''; }
 
   plotRouteStops(busKey);
 
@@ -338,8 +417,8 @@ window.selectBus = function () {
     }
 
     if (!data || !data.lat || !data.lng) {
-      document.getElementById('info').innerText = '🔴 Bus is currently OFFLINE';
-      if (etaLineEl) etaLineEl.innerText = '';
+      document.getElementById('info').innerText        = '🔴 Bus is currently OFFLINE';
+      document.getElementById('etaCard').style.display = 'none';
       if (busMarker) map.removeLayer(busMarker);
       busMarker       = null;
       lastPoint       = null;
@@ -348,9 +427,19 @@ window.selectBus = function () {
       return;
     }
 
+    // Ignore an out-of-order/duplicate update — never enqueue a fix
+    // older than one already accepted for this bus.
+    const fixTime = data.updatedAt || Date.now();
+    if (fixTime <= lastFixTime) {
+      processRoadETA(data.lat, data.lng, data.speed, data.stopIndex, busKey);
+      return;
+    }
+    lastFixTime = fixTime;
+
     if (!busMarker) {
       busMarker = L.marker([data.lat, data.lng], {
-        icon: updateBusIcon(), zIndexOffset: 1000,
+        icon:         updateBusIcon(),
+        zIndexOffset: 1000,
       }).addTo(map);
       map.setView([data.lat, data.lng], 15);
     }
@@ -361,35 +450,28 @@ window.selectBus = function () {
       if (speedHistory.length > SPEED_BUFFER_SIZE) speedHistory.shift();
     }
 
-    // Latency compensation — now skipped entirely if the fix is noisy
-    // (accuracy worse than MAX_ACCURACY_M) and clamped to MAX_PREDICTION_DIST_M
-    // so a bad heading reading can't push the point off-road.
-    const rawUpdatedAt = data.updatedAt || Date.now();
-    const latencySec = Math.min(Math.max((Date.now() - rawUpdatedAt) / 1000, 0), 8);
-    let pointLat = data.lat, pointLng = data.lng;
-
-    const accuracyOk = !(typeof data.accuracy === 'number' && data.accuracy > MAX_ACCURACY_M);
-
-    if (accuracyOk && (data.speed || 0) > 1.5 && latencySec > 0.3) {
-      const compensated = extrapolateLatLng(pointLat, pointLng, data.speed, data.heading || 0, latencySec);
-      const clamped = clampToMaxDrift(data.lat, data.lng, compensated.lat, compensated.lng);
-      pointLat = clamped.lat;
-      pointLng = clamped.lng;
-    }
-
-    enqueuePoint({
-      lat: pointLat, lng: pointLng,
-      speed: data.speed || 0, heading: data.heading || 0,
-      accuracy: data.accuracy,
-      updatedAt: rawUpdatedAt,
+    // Snap to road, but guard against a stale/delayed response from an
+    // earlier request overwriting a newer one.
+    const thisRequestId = ++snapRequestId;
+    snapToRoad(data.lat, data.lng).then(snapped => {
+      if (thisRequestId !== snapRequestId) return; // superseded by a newer fix — discard
+      enqueuePoint({
+        lat:       snapped.lat,
+        lng:       snapped.lng,
+        speed:     data.speed   || 0,
+        heading:   data.heading || 0,
+        updatedAt: fixTime,
+      });
     });
 
-    document.getElementById('info').innerText = '🟢 Link Connection Active';
+    document.getElementById('info').innerText        = '🟢 Link Connection Active';
+    document.getElementById('etaCard').style.display = 'block';
 
     processRoadETA(data.lat, data.lng, data.speed, data.stopIndex, busKey);
   });
 };
 
+// ── Topbar toggle ────────────────────────────────────────────
 window.toggleTopbar = function () {
   const topbar = document.getElementById('topbar');
   const btn    = document.getElementById('togglePanelBtn');
