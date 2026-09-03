@@ -11,6 +11,9 @@ let isAnimating  = false;
 let lastPoint    = null;
 let predictionId = null;
 
+const MAX_PREDICTION_DIST_M = 80;   // hard cap — prediction can never drift more than this from last real fix
+const MAX_ACCURACY_M        = 50;   // skip prediction/latency-comp if GPS fix is this noisy or worse
+
 const belagaviBounds = L.latLngBounds(
   L.latLng(BELAGAVI_BOUNDS[0][0], BELAGAVI_BOUNDS[0][1]),
   L.latLng(BELAGAVI_BOUNDS[1][0], BELAGAVI_BOUNDS[1][1])
@@ -83,11 +86,6 @@ function updateBusIcon() {
   });
 }
 
-// ── Shared dead-reckoning math ──
-// Given a lat/lng, speed (m/s) and heading (degrees), returns the position
-// after `seconds` of travel in a straight line. Used both to compensate for
-// network/GPS latency on incoming fixes, and to keep the marker gliding
-// forward while waiting for the next fix.
 function extrapolateLatLng(lat, lng, speedMs, headingDeg, seconds) {
   const headingRad = (headingDeg || 0) * Math.PI / 180;
   const dLat = (speedMs * seconds * Math.cos(headingRad)) / 111320;
@@ -95,14 +93,25 @@ function extrapolateLatLng(lat, lng, speedMs, headingDeg, seconds) {
   return { lat: lat + dLat, lng: lng + dLng };
 }
 
+// Clamp an extrapolated point so it can never sit more than MAX_PREDICTION_DIST_M
+// from the anchor (last real GPS fix). This is what stops the marker drifting
+// into a lake or off-road when heading/speed data is noisy.
+function clampToMaxDrift(anchorLat, anchorLng, targetLat, targetLng) {
+  const driftKm = getDistance(anchorLat, anchorLng, targetLat, targetLng);
+  const maxKm = MAX_PREDICTION_DIST_M / 1000;
+  if (driftKm <= maxKm) return { lat: targetLat, lng: targetLng };
+  const ratio = maxKm / driftKm;
+  return {
+    lat: anchorLat + (targetLat - anchorLat) * ratio,
+    lng: anchorLng + (targetLng - anchorLng) * ratio,
+  };
+}
+
 function enqueuePoint(point) {
   gpsQueue.push(point);
   if (!isAnimating) processQueue();
 }
 
-// ── Smooth interpolation between real GPS fixes ──
-// When the queue drains (no new fix waiting), hand off to startPrediction()
-// instead of freezing the marker, so it keeps advancing between updates.
 function processQueue() {
   if (gpsQueue.length === 0) {
     isAnimating = false;
@@ -115,9 +124,6 @@ function processQueue() {
   const from = lastPoint;
   const to   = gpsQueue.shift();
 
-  // Tween from wherever the marker is actually sitting right now (which may
-  // be a predicted position), not from the last stored real fix — avoids a
-  // visible backward snap when real data lands.
   const currentPos = busMarker ? busMarker.getLatLng() : null;
 
   if (!from) {
@@ -146,7 +152,6 @@ function processQueue() {
   function animate(now) {
     const elapsed = now - startTime;
     const progress = Math.min(elapsed / duration, 1);
-    // Cubic ease-in-out — smoother "crawl" than a linear/quad tween.
     const ease = progress < 0.5
       ? 4 * progress * progress * progress
       : 1 - Math.pow(-2 * progress + 2, 3) / 2;
@@ -163,19 +168,20 @@ function processQueue() {
   requestAnimationFrame(animate);
 }
 
-// ── Dead-reckoning prediction ──
-// Runs while waiting for the next real GPS fix, extrapolating position
-// forward from last known speed + heading so the marker keeps advancing
-// in real time instead of sitting still between updates.
+// Dead-reckoning prediction — now gated on accuracy and hard-clamped to
+// MAX_PREDICTION_DIST_M from the last real fix, so bad heading/speed data
+// can never send the marker wandering off-road or into water.
 function startPrediction() {
   if (!lastPoint || lastPoint.speed < 1.5) return;
+  if (typeof lastPoint.accuracy === 'number' && lastPoint.accuracy > MAX_ACCURACY_M) return;
   stopPrediction();
 
-  const MAX_PREDICTION_MS = 8000;
+  const MAX_PREDICTION_MS = 4000;
+  const anchorLat = lastPoint.lat, anchorLng = lastPoint.lng;
   const predStart = performance.now();
   const speedMs = lastPoint.speed;
   const headingDeg = lastPoint.heading || 0;
-  let predLat = lastPoint.lat, predLng = lastPoint.lng;
+  let predLat = anchorLat, predLng = anchorLng;
   let lastTime = performance.now();
 
   function predict(now) {
@@ -186,7 +192,8 @@ function startPrediction() {
     const dt = (now - lastTime) / 1000;
     lastTime = now;
     const next = extrapolateLatLng(predLat, predLng, speedMs, headingDeg, dt);
-    predLat = next.lat; predLng = next.lng;
+    const clamped = clampToMaxDrift(anchorLat, anchorLng, next.lat, next.lng);
+    predLat = clamped.lat; predLng = clamped.lng;
     if (busMarker) busMarker.setLatLng([predLat, predLng]);
     predictionId = requestAnimationFrame(predict);
   }
@@ -203,11 +210,6 @@ function getEtaColor(minutes) {
   return '#16a34a';
 }
 
-// ── ETA — writes into the TOP card (#etaLine) ──
-// Morning shifts (7:30 AM / 9:00 AM) always target the final destination
-// (KLS GIT Campus) directly, regardless of which pickup stop the bus is
-// currently near. Drop shifts still route stop-by-stop to the student's
-// drop-off point, since that's the actual destination for those routes.
 async function processRoadETA(busLat, busLng, busSpeed, firebaseStopIndex, busKey) {
   try {
     const etaLineEl = document.getElementById('etaLine');
@@ -359,24 +361,26 @@ window.selectBus = function () {
       if (speedHistory.length > SPEED_BUFFER_SIZE) speedHistory.shift();
     }
 
-    // ── Latency compensation ──
-    // The fix left the driver's phone at data.updatedAt but only reaches us
-    // now, after network + write delay. Push it forward by that gap using
-    // the reported speed/heading, so the marker reflects where the bus
-    // actually is right now instead of where it was a moment ago.
+    // Latency compensation — now skipped entirely if the fix is noisy
+    // (accuracy worse than MAX_ACCURACY_M) and clamped to MAX_PREDICTION_DIST_M
+    // so a bad heading reading can't push the point off-road.
     const rawUpdatedAt = data.updatedAt || Date.now();
     const latencySec = Math.min(Math.max((Date.now() - rawUpdatedAt) / 1000, 0), 8);
     let pointLat = data.lat, pointLng = data.lng;
 
-    if ((data.speed || 0) > 1.5 && latencySec > 0.3) {
+    const accuracyOk = !(typeof data.accuracy === 'number' && data.accuracy > MAX_ACCURACY_M);
+
+    if (accuracyOk && (data.speed || 0) > 1.5 && latencySec > 0.3) {
       const compensated = extrapolateLatLng(pointLat, pointLng, data.speed, data.heading || 0, latencySec);
-      pointLat = compensated.lat;
-      pointLng = compensated.lng;
+      const clamped = clampToMaxDrift(data.lat, data.lng, compensated.lat, compensated.lng);
+      pointLat = clamped.lat;
+      pointLng = clamped.lng;
     }
 
     enqueuePoint({
       lat: pointLat, lng: pointLng,
       speed: data.speed || 0, heading: data.heading || 0,
+      accuracy: data.accuracy,
       updatedAt: rawUpdatedAt,
     });
 
