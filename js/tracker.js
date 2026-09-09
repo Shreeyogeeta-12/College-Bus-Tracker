@@ -13,13 +13,16 @@ const gpsQueue     = [];
 let isAnimating    = false;
 let lastPoint      = null;
 let predictionId   = null;
-let snapRequestId  = 0;   // guards against out-of-order snapToRoad responses
-let lastFixTime    = 0;   // last Firebase updatedAt actually accepted
+let snapRequestId  = 0;
+let lastFixTime    = 0;
+let lastRawLat     = null;
+let lastRawLng     = null;
 
-const MAX_PREDICTION_MS     = 5000; // freeze marker after 5s without a real update
-const MAX_PREDICTION_DIST_M = 60;   // dead-reckoning can never drift more than this
-const MAX_SNAP_DEVIATION_M  = 60;   // discard a snap-to-road result that's implausibly far from the raw GPS fix
-const MAX_IMPLIED_SPEED_MS  = 35;   // ~126 km/h — reject GPS points that imply teleportation
+const MAX_PREDICTION_MS         = 5000;
+const MAX_PREDICTION_DIST_M     = 60;
+const MAX_SNAP_DEVIATION_M      = 60;
+const MAX_IMPLIED_SPEED_MS      = 35;
+const STATIONARY_MOVE_THRESHOLD_M = 10;
 
 // ── Map setup ────────────────────────────────────────────────
 const belagaviBounds = L.latLngBounds(
@@ -95,7 +98,7 @@ function plotRouteStops(busKey) {
   });
 }
 
-// ── Bus icon — red teardrop pin, SVG bus ──
+// ── Bus icon ──
 function updateBusIcon() {
   return L.divIcon({
     className: '',
@@ -129,9 +132,6 @@ function clampToMaxDrift(anchorLat, anchorLng, targetLat, targetLng, maxM) {
 }
 
 // ── Queue-based smooth animation ─────────────────────────────
-// Rejects only genuinely implausible GPS teleports (implied speed check),
-// not legitimate slow-moving points — the old filter here used to silently
-// drop valid fixes, which caused freeze/jump artifacts.
 function enqueuePoint(point) {
   if (lastPoint) {
     const distKm = getDistance(lastPoint.lat, lastPoint.lng, point.lat, point.lng);
@@ -208,11 +208,7 @@ function processQueue() {
   requestAnimationFrame(animate);
 }
 
-// ── Predictive movement — ONE definition only. Freezes after
-// MAX_PREDICTION_MS without a real fix, and is hard-clamped so it can
-// never drift more than MAX_PREDICTION_DIST_M from the last real point.
-// Never starts at all if the bus's last reported speed is near zero —
-// this is what makes the marker actually stop when the bus stops. ──
+// ── Predictive movement ──
 function startPrediction() {
   if (!lastPoint || lastPoint.speed < 1.5) return;
   stopPrediction();
@@ -228,7 +224,7 @@ function startPrediction() {
 
   function predict(now) {
     if (now - predStart > MAX_PREDICTION_MS) {
-      predictionId = null; // stop — wait for a real GPS fix instead of guessing further
+      predictionId = null;
       return;
     }
 
@@ -259,11 +255,7 @@ function stopPrediction() {
   }
 }
 
-// ── Snap to road — now sanity-checked. If OLA Maps snaps to a road
-// segment implausibly far from the raw GPS fix (a known cause of the
-// "jumps forward then back" symptom when it briefly mis-snaps to a
-// nearby parallel road), the snap is discarded and the raw fix is used
-// instead. ──
+// ── Snap to road ──
 async function snapToRoad(lat, lng) {
   try {
     const response = await fetch(
@@ -280,7 +272,7 @@ async function snapToRoad(lat, lng) {
       };
       const deviationKm = getDistance(lat, lng, snapped.lat, snapped.lng);
       if (deviationKm * 1000 > MAX_SNAP_DEVIATION_M) {
-        return { lat, lng }; // reject implausible snap, use raw fix
+        return { lat, lng };
       }
       return snapped;
     }
@@ -297,18 +289,20 @@ function getEtaColor(minutes) {
   return '#16a34a';
 }
 
-// ── ETA calculation — uses stopIndex from Firebase ───────────
+// ── ETA — writes into #etaLine (matches current index.html structure) ──
 async function processRoadETA(busLat, busLng, busSpeed, firebaseStopIndex, busKey) {
   try {
+    const etaLineEl = document.getElementById('etaLine');
+    if (!etaLineEl) return;
+
     const stops = ROUTE_STOPS[busKey] || [];
     if (stops.length === 0) return;
 
     const nextIdx = (typeof firebaseStopIndex === 'number') ? firebaseStopIndex : 0;
 
     if (nextIdx >= stops.length) {
-      document.getElementById('etaTime').innerText        = '✅';
-      document.getElementById('etaDestination').innerText = 'Arrived at destination';
-      document.getElementById('etaDist').innerText        = '';
+      etaLineEl.innerHTML = `✅ <b>Arrived at destination</b>`;
+      etaLineEl.style.color = '#16a34a';
       return;
     }
 
@@ -361,17 +355,14 @@ async function processRoadETA(busLat, busLng, busSpeed, firebaseStopIndex, busKe
 
     const isStopped = speedHistory.length >= 3 &&
                       speedHistory.every(s => s < 0.5);
+    const etaColor = getEtaColor(etaMinutes);
+    const etaLabel = isStopped ? '~' + etaMinutes : String(etaMinutes);
 
-    const etaEl  = document.getElementById('etaTime');
-    const destEl = document.getElementById('etaDestination');
-    const distEl = document.getElementById('etaDist');
-
-    etaEl.innerText   = isStopped ? '~' + etaMinutes : String(etaMinutes);
-    etaEl.style.color = getEtaColor(etaMinutes);
-    destEl.innerText  = `Next Stop: ${nextStopName}`;
-    distEl.innerText  = isStopped
-      ? `${roadDistKm.toFixed(1)} km — Bus may be stopped`
-      : `${roadDistKm.toFixed(1)} km away`;
+    etaLineEl.innerHTML =
+      `⏱ ETA to <b>${nextStopName}</b>: ` +
+      `<span style="color:${etaColor}; font-weight:700;">${etaLabel} min</span>` +
+      ` &nbsp;·&nbsp; ${roadDistKm.toFixed(1)} km` +
+      (isStopped ? ` <span style="color:#888;">(bus may be stopped)</span>` : '');
 
   } catch (err) {
     console.error('ETA error:', err);
@@ -393,12 +384,17 @@ window.selectBus = function () {
   lastPoint       = null;
   gpsQueue.length = 0;
   lastFixTime     = 0;
-  snapRequestId++; // invalidate any snap-to-road calls still in flight for the previous bus
+  lastRawLat      = null;
+  lastRawLng      = null;
+  snapRequestId++;
   stopPrediction();
 
   document.getElementById('info').innerText = 'Syncing data feed...';
   document.getElementById('driverInfo').innerText =
     `Driver: ${DRIVER_DB[busKey] || 'Assigned Duty Driver'}`;
+
+  const etaLineEl = document.getElementById('etaLine');
+  if (etaLineEl) { etaLineEl.innerText = ''; etaLineEl.style.color = ''; }
 
   plotRouteStops(busKey);
 
@@ -417,18 +413,18 @@ window.selectBus = function () {
     }
 
     if (!data || !data.lat || !data.lng) {
-      document.getElementById('info').innerText        = '🔴 Bus is currently OFFLINE';
-      document.getElementById('etaCard').style.display = 'none';
+      document.getElementById('info').innerText = '🔴 Bus is currently OFFLINE';
+      if (etaLineEl) etaLineEl.innerText = '';
       if (busMarker) map.removeLayer(busMarker);
       busMarker       = null;
       lastPoint       = null;
       gpsQueue.length = 0;
+      lastRawLat      = null;
+      lastRawLng      = null;
       stopPrediction();
       return;
     }
 
-    // Ignore an out-of-order/duplicate update — never enqueue a fix
-    // older than one already accepted for this bus.
     const fixTime = data.updatedAt || Date.now();
     if (fixTime <= lastFixTime) {
       processRoadETA(data.lat, data.lng, data.speed, data.stopIndex, busKey);
@@ -442,6 +438,8 @@ window.selectBus = function () {
         zIndexOffset: 1000,
       }).addTo(map);
       map.setView([data.lat, data.lng], 15);
+      lastRawLat = data.lat;
+      lastRawLng = data.lng;
     }
 
     const rawSpeed = (typeof data.speed === 'number' && data.speed > 0.5) ? data.speed : null;
@@ -450,22 +448,29 @@ window.selectBus = function () {
       if (speedHistory.length > SPEED_BUFFER_SIZE) speedHistory.shift();
     }
 
-    // Snap to road, but guard against a stale/delayed response from an
-    // earlier request overwriting a newer one.
-    const thisRequestId = ++snapRequestId;
-    snapToRoad(data.lat, data.lng).then(snapped => {
-      if (thisRequestId !== snapRequestId) return; // superseded by a newer fix — discard
-      enqueuePoint({
-        lat:       snapped.lat,
-        lng:       snapped.lng,
-        speed:     data.speed   || 0,
-        heading:   data.heading || 0,
-        updatedAt: fixTime,
-      });
-    });
+    const movedDistM = (lastRawLat !== null)
+      ? getDistance(lastRawLat, lastRawLng, data.lat, data.lng) * 1000
+      : Infinity;
+    const isNearlyStationary = (data.speed || 0) < 1.5 && movedDistM < STATIONARY_MOVE_THRESHOLD_M;
 
-    document.getElementById('info').innerText        = '🟢 Link Connection Active';
-    document.getElementById('etaCard').style.display = 'block';
+    if (!isNearlyStationary) {
+      lastRawLat = data.lat;
+      lastRawLng = data.lng;
+
+      const thisRequestId = ++snapRequestId;
+      snapToRoad(data.lat, data.lng).then(snapped => {
+        if (thisRequestId !== snapRequestId) return;
+        enqueuePoint({
+          lat:       snapped.lat,
+          lng:       snapped.lng,
+          speed:     data.speed   || 0,
+          heading:   data.heading || 0,
+          updatedAt: fixTime,
+        });
+      });
+    }
+
+    document.getElementById('info').innerText = '🟢 Link Connection Active';
 
     processRoadETA(data.lat, data.lng, data.speed, data.stopIndex, busKey);
   });
