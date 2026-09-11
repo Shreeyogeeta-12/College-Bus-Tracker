@@ -17,6 +17,8 @@ let snapRequestId  = 0;
 let lastFixTime    = 0;
 let lastRawLat     = null;
 let lastRawLng     = null;
+let lastSnappedLat = null;
+let lastSnappedLng = null;
 
 const MAX_PREDICTION_MS         = 5000;
 const MAX_PREDICTION_DIST_M     = 60;
@@ -444,16 +446,29 @@ window.selectBus = function () {
       lastRawLat = data.lat;
       lastRawLng = data.lng;
 
+     if (!isNearlyStationary) {
+      lastRawLat = data.lat;
+      lastRawLng = data.lng;
+
+      // Animate on the raw GPS fix immediately — do NOT wait for the
+      // snap-to-road network call. Waiting introduced irregular
+      // 150ms-2s delays before each animation started, which is what
+      // was causing the stutter/non-smooth motion.
+      enqueuePoint({
+        lat:       data.lat,
+        lng:       data.lng,
+        speed:     data.speed   || 0,
+        heading:   data.heading || 0,
+        updatedAt: fixTime,
+      });
+
+      // Snap-to-road still runs, but only to correct the ETA/road-distance
+      // math in the background — never gates the marker animation.
       const thisRequestId = ++snapRequestId;
       snapToRoad(data.lat, data.lng).then(snapped => {
         if (thisRequestId !== snapRequestId) return;
-        enqueuePoint({
-          lat:       snapped.lat,
-          lng:       snapped.lng,
-          speed:     data.speed   || 0,
-          heading:   data.heading || 0,
-          updatedAt: fixTime,
-        });
+        lastSnappedLat = snapped.lat;
+        lastSnappedLng = snapped.lng;
       });
     }
 
