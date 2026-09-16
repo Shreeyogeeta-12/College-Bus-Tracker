@@ -446,10 +446,6 @@ window.selectBus = function () {
       lastRawLat = data.lat;
       lastRawLng = data.lng;
 
-     if (!isNearlyStationary) {
-      lastRawLat = data.lat;
-      lastRawLng = data.lng;
-
       // Animate on the raw GPS fix immediately — do NOT wait for the
       // snap-to-road network call. Waiting introduced irregular
       // 150ms-2s delays before each animation started, which is what
