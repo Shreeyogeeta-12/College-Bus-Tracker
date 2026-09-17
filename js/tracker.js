@@ -1,5 +1,6 @@
 /* ============================================================
    tracker.js — Student-facing bus tracker logic
+   Depends on CAMPUS_LOCATION being defined in config.js
    ============================================================ */
 
 // ── State ────────────────────────────────────────────────────
@@ -21,12 +22,13 @@ let stationaryBreakCount = 0;
 
 const MAX_PREDICTION_MS              = 5000;
 const MAX_PREDICTION_DIST_M          = 60;
-const MAX_SNAP_DEVIATION_M           = 35;   // tightened from 60 — reduces marker landing on a wrong/far road segment
+const MAX_SNAP_DEVIATION_M           = 35;
 const MAX_IMPLIED_SPEED_MS           = 35;
-const STATIONARY_MOVE_THRESHOLD_M    = 15;   // raised from 10 — realistic smartphone GPS drift at rest
-const STATIONARY_INSTANT_ACCEPT_M    = 45;   // a jump this large is unambiguously real movement — skip debounce
-const STATIONARY_BREAK_CONFIRMATIONS = 2;    // consecutive "looks like movement" fixes required before trusting it
-const SNAP_WAIT_TIMEOUT_MS           = 900;  // raised from 400 — gives OLA Maps a realistic window to respond so the marker is consistently road-snapped
+const STATIONARY_MOVE_THRESHOLD_M    = 15;
+const STATIONARY_INSTANT_ACCEPT_M    = 45;
+const STATIONARY_BREAK_CONFIRMATIONS = 2;
+const SNAP_WAIT_TIMEOUT_MS           = 900;
+const ARRIVED_RADIUS_KM              = 0.1; // ~100m — treated as "arrived at KLS GIT"
 
 // ── Map setup ────────────────────────────────────────────────
 const belagaviBounds = L.latLngBounds(
@@ -175,16 +177,19 @@ function processQueue() {
   const endLng    = to.lng;
   const startTime = performance.now();
 
+  // ── SMOOTHNESS FIX ──
+  // Was: cubic ease-in-out, which decelerates then re-accelerates at every
+  // single GPS fix boundary — with fixes arriving every ~0.5-1s that reads
+  // as a constant little "breathing" stutter rather than continuous travel.
+  // Google Maps / Uber-style vehicle markers move at CONSTANT velocity
+  // between fixes and only ease when the vehicle is confirmed stopped —
+  // so this is now plain linear interpolation, matching real travel speed.
   function animate(now) {
     const elapsed  = now - startTime;
-    const progress = Math.min(elapsed / duration, 1);
+    const progress = Math.min(elapsed / duration, 1); // linear, no easing curve
 
-    const ease = progress < 0.5
-      ? 4 * progress * progress * progress
-      : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-
-    const lat = startLat + (endLat - startLat) * ease;
-    const lng = startLng + (endLng - startLng) * ease;
+    const lat = startLat + (endLat - startLat) * progress;
+    const lng = startLng + (endLng - startLng) * progress;
 
     if (busMarker) busMarker.setLatLng([lat, lng]);
 
@@ -199,7 +204,7 @@ function processQueue() {
   requestAnimationFrame(animate);
 }
 
-// ── Predictive movement ──
+// ── Predictive movement ── (already linear/constant-speed — unchanged)
 function startPrediction() {
   if (!lastPoint || lastPoint.speed < 1.5) return;
   stopPrediction();
@@ -273,9 +278,6 @@ async function snapToRoad(lat, lng) {
   return { lat, lng };
 }
 
-// Races snapToRoad against a timeout so a slow network response can never
-// stall the marker for more than SNAP_WAIT_TIMEOUT_MS. Falls back to the
-// raw GPS point only if the snap genuinely doesn't resolve in time.
 function snapToRoadWithTimeout(lat, lng) {
   return Promise.race([
     snapToRoad(lat, lng),
@@ -290,28 +292,21 @@ function getEtaColor(minutes) {
   return '#16a34a';
 }
 
-// ── ETA — writes into #etaLine ──
-async function processRoadETA(busLat, busLng, busSpeed, firebaseStopIndex, busKey) {
+// ── ETA — ALWAYS to KLS GIT campus, regardless of shift/direction ──
+// Replaces the old next-stop/stopIndex logic entirely. Every shift,
+// every bus, every position → same target: CAMPUS_LOCATION.
+async function processRoadETA(busLat, busLng, busSpeed) {
   try {
     const etaLineEl = document.getElementById('etaLine');
     if (!etaLineEl) return;
 
-    const stops = ROUTE_STOPS[busKey] || [];
-    if (stops.length === 0) return;
+    const distKm = getDistance(busLat, busLng, CAMPUS_LOCATION.lat, CAMPUS_LOCATION.lng);
 
-    const nextIdx = (typeof firebaseStopIndex === 'number') ? firebaseStopIndex : 0;
-
-    if (nextIdx >= stops.length) {
-      etaLineEl.innerHTML = `✅ <b>Arrived at destination</b>`;
+    if (distKm < ARRIVED_RADIUS_KM) {
+      etaLineEl.innerHTML = `✅ <b>Arrived at KLS GIT</b>`;
       etaLineEl.style.color = '#16a34a';
       return;
     }
-
-    const nextStopName  = stops[nextIdx];
-    const nextStopCoord = STOP_COORDS[nextStopName];
-    if (!nextStopCoord) return;
-
-    const distKm = getDistance(busLat, busLng, nextStopCoord.lat, nextStopCoord.lng);
 
     const speedMs  = (busSpeed && busSpeed > 0.5) ? busSpeed : CITY_DEFAULT_SPEED_MS;
     const speedKmh = speedMs * 3.6;
@@ -323,7 +318,7 @@ async function processRoadETA(busLat, busLng, busSpeed, firebaseStopIndex, busKe
       const response = await fetch(
         `https://api.olamaps.io/routing/v1/directions` +
         `?origin=${busLat},${busLng}` +
-        `&destination=${nextStopCoord.lat},${nextStopCoord.lng}` +
+        `&destination=${CAMPUS_LOCATION.lat},${CAMPUS_LOCATION.lng}` +
         `&overview=full` +
         `&api_key=${OLA_MAPS_API_KEY}`,
         { method: 'POST' }
@@ -360,7 +355,7 @@ async function processRoadETA(busLat, busLng, busSpeed, firebaseStopIndex, busKe
     const etaLabel = isStopped ? '~' + etaMinutes : String(etaMinutes);
 
     etaLineEl.innerHTML =
-      `⏱ ETA to <b>${nextStopName}</b>: ` +
+      `⏱ ETA to <b>KLS GIT</b>: ` +
       `<span style="color:${etaColor}; font-weight:700;">${etaLabel} min</span>` +
       ` &nbsp;·&nbsp; ${roadDistKm.toFixed(1)} km` +
       (isStopped ? ` <span style="color:#888;">(bus may be stopped)</span>` : '');
@@ -430,7 +425,7 @@ window.selectBus = function () {
 
     const fixTime = data.updatedAt || Date.now();
     if (fixTime <= lastFixTime) {
-      processRoadETA(data.lat, data.lng, data.speed, data.stopIndex, busKey);
+      processRoadETA(data.lat, data.lng, data.speed);
       return;
     }
     lastFixTime = fixTime;
@@ -451,14 +446,6 @@ window.selectBus = function () {
       if (speedHistory.length > SPEED_BUFFER_SIZE) speedHistory.shift();
     }
 
-    // ── Stationary debounce (fixes #3: marker fluctuating while parked) ──
-    // A single noisy GPS fix can look like "movement" even when the bus
-    // hasn't gone anywhere — smartphone GPS commonly drifts 10-20m at rest.
-    // Require TWO consecutive fixes that look like real movement before
-    // actually moving the marker. One-off noise never accumulates two
-    // confirmations in a row, so a parked bus now stays visually locked.
-    // A single very large jump is still accepted immediately, so the
-    // marker isn't sluggish to react when the bus genuinely pulls away.
     const movedDistM = (lastRawLat !== null)
       ? getDistance(lastRawLat, lastRawLng, data.lat, data.lng) * 1000
       : Infinity;
@@ -478,24 +465,22 @@ window.selectBus = function () {
       lastRawLat = data.lat;
       lastRawLng = data.lng;
 
-      // ── Snap-to-road wait (fixes #1 and #2: off-road placement, and
-      // inconsistent motion from alternating between snapped/raw points) ──
       const thisRequestId = ++snapRequestId;
       snapToRoadWithTimeout(data.lat, data.lng).then(snapped => {
-        if (thisRequestId !== snapRequestId) return; // superseded by a newer fix — discard
+        if (thisRequestId !== snapRequestId) return;
         enqueuePoint({
           lat:       snapped.lat,
           lng:       snapped.lng,
           speed:     data.speed   || 0,
           heading:   data.heading || 0,
-          updatedAt: fixTime,  
+          updatedAt: fixTime,
         });
       });
     }
 
     document.getElementById('info').innerText = '🟢 Link Connection Active';
 
-    processRoadETA(data.lat, data.lng, data.speed, data.stopIndex, busKey);
+    processRoadETA(data.lat, data.lng, data.speed);
   });
 };
 
