@@ -17,14 +17,16 @@ let snapRequestId  = 0;
 let lastFixTime    = 0;
 let lastRawLat     = null;
 let lastRawLng     = null;
-let lastSnappedLat = null;
-let lastSnappedLng = null;
+let stationaryBreakCount = 0;
 
-const MAX_PREDICTION_MS         = 5000;
-const MAX_PREDICTION_DIST_M     = 60;
-const MAX_SNAP_DEVIATION_M      = 60;
-const MAX_IMPLIED_SPEED_MS      = 35;
-const STATIONARY_MOVE_THRESHOLD_M = 10;
+const MAX_PREDICTION_MS              = 5000;
+const MAX_PREDICTION_DIST_M          = 60;
+const MAX_SNAP_DEVIATION_M           = 35;   // tightened from 60 — reduces marker landing on a wrong/far road segment
+const MAX_IMPLIED_SPEED_MS           = 35;
+const STATIONARY_MOVE_THRESHOLD_M    = 15;   // raised from 10 — realistic smartphone GPS drift at rest
+const STATIONARY_INSTANT_ACCEPT_M    = 45;   // a jump this large is unambiguously real movement — skip debounce
+const STATIONARY_BREAK_CONFIRMATIONS = 2;    // consecutive "looks like movement" fixes required before trusting it
+const SNAP_WAIT_TIMEOUT_MS           = 900;  // raised from 400 — gives OLA Maps a realistic window to respond so the marker is consistently road-snapped
 
 // ── Map setup ────────────────────────────────────────────────
 const belagaviBounds = L.latLngBounds(
@@ -244,7 +246,7 @@ function stopPrediction() {
   }
 }
 
-// ── Snap to road ──
+// ── Snap to road — sanity-checked against implausible deviation ──
 async function snapToRoad(lat, lng) {
   try {
     const response = await fetch(
@@ -271,6 +273,16 @@ async function snapToRoad(lat, lng) {
   return { lat, lng };
 }
 
+// Races snapToRoad against a timeout so a slow network response can never
+// stall the marker for more than SNAP_WAIT_TIMEOUT_MS. Falls back to the
+// raw GPS point only if the snap genuinely doesn't resolve in time.
+function snapToRoadWithTimeout(lat, lng) {
+  return Promise.race([
+    snapToRoad(lat, lng),
+    new Promise(resolve => setTimeout(() => resolve({ lat, lng }), SNAP_WAIT_TIMEOUT_MS)),
+  ]);
+}
+
 // ── ETA color ────────────────────────────────────────────────
 function getEtaColor(minutes) {
   if (minutes < 5)  return '#dc2626';
@@ -278,7 +290,7 @@ function getEtaColor(minutes) {
   return '#16a34a';
 }
 
-// ── ETA — writes into #etaLine (matches current index.html structure) ──
+// ── ETA — writes into #etaLine ──
 async function processRoadETA(busLat, busLng, busSpeed, firebaseStopIndex, busKey) {
   try {
     const etaLineEl = document.getElementById('etaLine');
@@ -375,6 +387,7 @@ window.selectBus = function () {
   lastFixTime     = 0;
   lastRawLat      = null;
   lastRawLng      = null;
+  stationaryBreakCount = 0;
   snapRequestId++;
   stopPrediction();
 
@@ -410,6 +423,7 @@ window.selectBus = function () {
       gpsQueue.length = 0;
       lastRawLat      = null;
       lastRawLng      = null;
+      stationaryBreakCount = 0;
       stopPrediction();
       return;
     }
@@ -437,34 +451,45 @@ window.selectBus = function () {
       if (speedHistory.length > SPEED_BUFFER_SIZE) speedHistory.shift();
     }
 
+    // ── Stationary debounce (fixes #3: marker fluctuating while parked) ──
+    // A single noisy GPS fix can look like "movement" even when the bus
+    // hasn't gone anywhere — smartphone GPS commonly drifts 10-20m at rest.
+    // Require TWO consecutive fixes that look like real movement before
+    // actually moving the marker. One-off noise never accumulates two
+    // confirmations in a row, so a parked bus now stays visually locked.
+    // A single very large jump is still accepted immediately, so the
+    // marker isn't sluggish to react when the bus genuinely pulls away.
     const movedDistM = (lastRawLat !== null)
       ? getDistance(lastRawLat, lastRawLng, data.lat, data.lng) * 1000
       : Infinity;
-    const isNearlyStationary = (data.speed || 0) < 1.5 && movedDistM < STATIONARY_MOVE_THRESHOLD_M;
+    const looksLikeMovement = (data.speed || 0) >= 1.5 || movedDistM >= STATIONARY_MOVE_THRESHOLD_M;
+    const isObviouslyMoving = movedDistM >= STATIONARY_INSTANT_ACCEPT_M;
 
-    if (!isNearlyStationary) {
+    if (!looksLikeMovement) {
+      stationaryBreakCount = 0;
+    } else {
+      stationaryBreakCount++;
+    }
+
+    const shouldUpdateMarker = isObviouslyMoving || stationaryBreakCount >= STATIONARY_BREAK_CONFIRMATIONS;
+
+    if (shouldUpdateMarker) {
+      stationaryBreakCount = 0;
       lastRawLat = data.lat;
       lastRawLng = data.lng;
 
-      // Animate on the raw GPS fix immediately — do NOT wait for the
-      // snap-to-road network call. Waiting introduced irregular
-      // 150ms-2s delays before each animation started, which is what
-      // was causing the stutter/non-smooth motion.
-      enqueuePoint({
-        lat:       data.lat,
-        lng:       data.lng,
-        speed:     data.speed   || 0,
-        heading:   data.heading || 0,
-        updatedAt: fixTime,
-      });
-
-      // Snap-to-road still runs, but only to correct the ETA/road-distance
-      // math in the background — never gates the marker animation.
+      // ── Snap-to-road wait (fixes #1 and #2: off-road placement, and
+      // inconsistent motion from alternating between snapped/raw points) ──
       const thisRequestId = ++snapRequestId;
-      snapToRoad(data.lat, data.lng).then(snapped => {
-        if (thisRequestId !== snapRequestId) return;
-        lastSnappedLat = snapped.lat;
-        lastSnappedLng = snapped.lng;
+      snapToRoadWithTimeout(data.lat, data.lng).then(snapped => {
+        if (thisRequestId !== snapRequestId) return; // superseded by a newer fix — discard
+        enqueuePoint({
+          lat:       snapped.lat,
+          lng:       snapped.lng,
+          speed:     data.speed   || 0,
+          heading:   data.heading || 0,
+          updatedAt: fixTime,
+        });
       });
     }
 
