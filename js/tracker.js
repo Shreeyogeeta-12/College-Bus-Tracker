@@ -488,7 +488,7 @@ window.selectBus = function () {
           lng:       snapped.lng,
           speed:     data.speed   || 0,
           heading:   data.heading || 0,
-          updatedAt: fixTime,
+          updatedAt: fixTime,  
         });
       });
     }
