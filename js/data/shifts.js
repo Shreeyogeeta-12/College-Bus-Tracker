@@ -40,41 +40,4 @@ const SHIFT_BUSES = {
     { id: "m900_b13", label: "Shahu Nagar" },
     { id: "m900_b14", label: "Khanapur" },
   ],
-
-  drop130: [
-    { id: "d130_b1", label: "Vadagaon & Bhagya Nagar" },
-    { id: "d130_b2", label: "RC Nagar" },
-    { id: "d130_b3", label: "Mahantesh Nagar" },
-    { id: "d130_b4", label: "Hanuman Nagar & Ganeshpur" },
-    { id: "d130_b5", label: "CBT" },
-    { id: "d130_b6", label: "Kakati" },
-    { id: "d130_b7", label: "Marihal & Sambra" },
-    { id: "d130_b8", label: "Shahapur" },
-    { id: "d130_b9", label: "Khanapur" },
-  ],
-
-  drop400: [
-    { id: "d400_b1", label: "Kakati" },
-    { id: "d400_b2", label: "RC Nagar" },
-    { id: "d400_b3", label: "Shahapur" },
-    { id: "d400_b4", label: "Hanuman Nagar & Ganeshpur" },
-    { id: "d400_b5", label: "Mahantesh Nagar" },
-    { id: "d400_b6", label: "Vadagaon" },
-    { id: "d400_b7", label: "Bhagya Nagar" },
-    { id: "d400_b8", label: "CBT" },
-  ],
-
-  drop515: [
-    { id: "d515_b1",  label: "Kakati" },
-    { id: "d515_b2",  label: "Vadagaon" },
-    { id: "d515_b3",  label: "RC Nagar" },
-    { id: "d515_b4",  label: "Shahapur" },
-    { id: "d515_b5",  label: "CBT" },
-    { id: "d515_b6",  label: "Bhagya Nagar" },
-    { id: "d515_b7",  label: "Ganeshpur" },
-    { id: "d515_b8",  label: "Mahantesh Nagar" },
-    { id: "d515_b9",  label: "Hanuman Nagar" },
-    { id: "d515_b10", label: "Marihal" },
-    { id: "d515_b11", label: "Khanapur" },
-  ],
 };

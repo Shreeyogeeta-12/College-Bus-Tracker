@@ -370,6 +370,21 @@ window.selectBus = function () {
   const busKey = document.getElementById('busSelect').value;
   if (!busKey) return;
 
+  // ── Daily open limit ─────────────────────────────────────
+  const today = new Date().toDateString();
+  const stored = JSON.parse(localStorage.getItem('busTrackerOpens') || '{}');
+  if (stored.date !== today) {
+    stored.date = today;
+    stored.count = 0;
+  }
+  if (stored.count >= 4) {
+    alert('You have reached the maximum of 4 tracker views for today. Please try again tomorrow.');
+    return;
+  }
+  stored.count++;
+  localStorage.setItem('busTrackerOpens', JSON.stringify(stored));
+  // ── End daily open limit ─────────────────────────────────
+
   if (currentBusKey && dbListenerRef) {
     db.ref('liveLocation/' + currentBusKey).off('value', dbListenerRef);
   }

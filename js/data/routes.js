@@ -42,37 +42,4 @@ const ROUTE_STOPS = {
   m900_b13: ["KLS GIT", "Shahu Nagar", "Nehru Nagar", "Camp", "Congress Road"],
   m900_b14: ["KLS GIT", "Khanapur Old Bus Stop", "Khanapur New Bus Stop", "Jamboti Cross", "Court", "Idalonda", "Prabhu Nagar", "Desur", "BCM Macche", "Macche", "Phirwadi Naka", "Brahma Nagar", "Jitu Hostel"],
 
-  // ── Drop 1:30 PM ─────────────────────────────────────────────
-  d130_b1: ["KLS GIT", "RPD Cross", "Goa Ves", "Nath Pai Circle", "Vadagaon", "Bhagya Nagar"],
-  d130_b2: ["KLS GIT", "1st Gate", "Lotus Hospital","Mandoli Road", "Guru Prasad Colony", "Laxmi Temple", "SBI Bank", "Post Office", "Jain Heritage School", "Utsav Hotel", "Banko"],
-  d130_b3: ["KLS GIT", "Bogarves", "Channamma circle", "RTO", "Mahantesh Nagar", "Sidnal stop", "Nandini dairy", "More stop", "Kanbargi", "Ramtheerth Nagar", "Ganesh circle", "Uday school", "Harsha hotel ", "Sai mandir", "Shrinagar", "SGBIT", "Ramdev"],
-  d130_b4: ["KLS GIT", "Pipeline","Ganeshpur","Vinayak circle","Ganapati temple","Kuvempu nagar","KLE International School","Vidya nagar","Kumar swamy layout","Hanuman nagar circle","NCC ground","Sadashiv nagar last stop"],
-  d130_b5: ["KLS GIT", "Fish Market", "Channamma Circle", "RTO", "CBT"],
-  d130_b6: ["KLS GIT", "Channamma Circle", "Indal Colony", "Kakati"],
-  d130_b7: ["KLS GIT", "Gandhi Nagar", "SC Motors", "Basavan Kudachi", "Shindolli Cross", "Nilaji Cross", "Mutaga", "Sambra", "Balekundri", "Honyall Cross", "Pant Balekundri"],
-  d130_b8: ["KLS GIT", "RPD Cross", "Goa Ves", "Tukaram Bank", "Shahapur"],
-  d130_b9: ["KLS GIT", "Machhe", "BCM Hostel", "Khanapur"],
-
-  // ── Drop 4:00 PM ─────────────────────────────────────────────
-  d400_b1: ["KLS GIT", "Channamma Circle", "Indal Colony", "Kakati"],
-  d400_b2: ["KLS GIT", "Guru Prasad Colony", "Mandoli Road", "RC Nagar"],
-  d400_b3: ["KLS GIT", "RPD Cross", "Goa Ves", "Tukaram Bank", "Shahapur"],
-  d400_b4: ["KLS GIT", "More", "Ganesh Temple", "Chavan Hostipal", "Vinayak Circle", "Ganapati TEemple", "Kuvempu Nagar", "KLE School", "Sahayadri Nagar", "Kumara Swamy Layout", "Hanuman Nagar 2nd Stop", "Hanuman Nagar Circle", "FirozSait Home Stop", "NCC Ground", "Neel Nagar", "Sadashiv Nagar", "Harsha"],
-  d400_b5: ["KLS GIT", "Bogarves", "Channamma circle", "RTO", "Mahantesh Nagar", "Sidnal stop", "Nandini dairy", "More stop", "Kanbargi", "Ramtheerth Nagar", "Ganesh circle", "Uday school", "Harsha hotel ", "Sai mandir", "Shrinagar", "SGBIT", "Ramdev"],
-  d400_b6: ["KLS GIT", "RPD Cross", "Goa Ves", "Nath Pai Circle", "Vadagaon"],
-  d400_b7: ["KLS GIT", "KLE Engg College", "Raghunath Peth", "Bhagya Nagar"],
-  d400_b8: ["KLS GIT", "Fish Market", "Channamma Circle", "RTO", "CBT"],
-
-  // ── Drop 5:15 PM ─────────────────────────────────────────────
-  d515_b1:  ["KLS GIT", "Channamma Circle", "Indal Colony", "Kakati"],
-  d515_b2:  ["KLS GIT", "RPD Cross", "Goa Ves", "Nath Pai Circle", "Vadagaon"],
-  d515_b3:  ["KLS GIT", "Guru Prasad Colony", "Mandoli Road", "RC Nagar"],
-  d515_b4:  ["KLS GIT", "RPD Cross", "Goa Ves", "Tukaram Bank", "Shahapur"],
-  d515_b5:  ["KLS GIT", "Fish Market", "Channamma Circle", "RTO", "CBT"],
-  d515_b6:  ["KLS GIT", "KLE Engg College", "Raghunath Peth", "Bhagya Nagar"],
-  d515_b7:  ["KLS GIT", "CBT", "Channamma Circle", "Ganeshpur"],
-  d515_b8:  ["KLS GIT", "Bogarves", "Channamma circle", "RTO", "Mahantesh Nagar", "Sidnal stop", "Nandini dairy", "More stop", "Kanbargi", "Ramtheerth Nagar", "Ganesh circle", "Uday school", "Harsha hotel ", "Sai mandir", "Shrinagar", "SGBIT", "Ramdev"],
-  d515_b9:  ["KLS GIT", "Congress Road", "Sadashiv Nagar Last Stop","Rail Nagar","NCC Office" , "Hanuman Nagar Circle","Hanuman nagar second cross","Hostel","Sahayadri nagar ","KLE School","KUvempu nagar","Ganapati temple"],
-  d515_b10: ["KLS GIT", "Fort Circle", "Gandhi Nagar", "Marihal"],
-  d515_b11: ["Khanapur Old Bus Stop", "Khanapur New Bus Stop", "Jamboti Cross", "Court", "Idalonda", "Prabhu Nagar", "Desur", "BCM Macche", "Macche", "Phirwadi Naka", "Brahma Nagar", "Jitu Hostel"],
 };
