@@ -20,8 +20,8 @@ let lastRawLat     = null;
 let lastRawLng     = null;
 let stationaryBreakCount = 0;
 
-const MAX_PREDICTION_MS              = 8000;
-const MAX_PREDICTION_DIST_M          = 90;
+const MAX_PREDICTION_MS              = 5000;
+const MAX_PREDICTION_DIST_M          = 60;
 const MAX_SNAP_DEVIATION_M           = 35;
 const MAX_IMPLIED_SPEED_MS           = 35;
 const STATIONARY_MOVE_THRESHOLD_M    = 15;
@@ -161,7 +161,7 @@ function processQueue() {
   }
 
   const timeDiff = to.updatedAt - from.updatedAt;
-  const duration = Math.min(Math.max(timeDiff, 500), 8000);
+  const duration = Math.min(Math.max(timeDiff, 500), 3000);
 
   const dist = getDistance(from.lat, from.lng, to.lat, to.lng);
   if (dist > 0.5) {
@@ -173,14 +173,23 @@ function processQueue() {
 
   const startLat  = currentPos ? currentPos.lat : from.lat;
   const startLng  = currentPos ? currentPos.lng : from.lng;
+  const endLat    = to.lat;
+  const endLng    = to.lng;
   const startTime = performance.now();
 
+  // ── SMOOTHNESS FIX ──
+  // Was: cubic ease-in-out, which decelerates then re-accelerates at every
+  // single GPS fix boundary — with fixes arriving every ~0.5-1s that reads
+  // as a constant little "breathing" stutter rather than continuous travel.
+  // Google Maps / Uber-style vehicle markers move at CONSTANT velocity
+  // between fixes and only ease when the vehicle is confirmed stopped —
+  // so this is now plain linear interpolation, matching real travel speed.
   function animate(now) {
     const elapsed  = now - startTime;
-    const progress = Math.min(elapsed / duration, 1);
+    const progress = Math.min(elapsed / duration, 1); // linear, no easing curve
 
-    const lat = startLat + (to.lat - startLat) * progress;
-    const lng = startLng + (to.lng - startLng) * progress;
+    const lat = startLat + (endLat - startLat) * progress;
+    const lng = startLng + (endLng - startLng) * progress;
 
     if (busMarker) busMarker.setLatLng([lat, lng]);
 
@@ -455,14 +464,12 @@ window.selectBus = function () {
     const movedDistM = (lastRawLat !== null)
       ? getDistance(lastRawLat, lastRawLng, data.lat, data.lng) * 1000
       : Infinity;
+    const looksLikeMovement = (data.speed || 0) >= 1.5 || movedDistM >= STATIONARY_MOVE_THRESHOLD_M;
+    const isObviouslyMoving = movedDistM >= STATIONARY_INSTANT_ACCEPT_M;
 
-    const isConfirmedMovingBySpeed        = (data.speed || 0) >= 1.5;
-    const looksLikeMovementByDistanceOnly = movedDistM >= STATIONARY_MOVE_THRESHOLD_M;
-    const isObviouslyMoving = isConfirmedMovingBySpeed || movedDistM >= STATIONARY_INSTANT_ACCEPT_M;
-
-    if (!looksLikeMovementByDistanceOnly && !isConfirmedMovingBySpeed) {
+    if (!looksLikeMovement) {
       stationaryBreakCount = 0;
-    } else if (!isConfirmedMovingBySpeed) {
+    } else {
       stationaryBreakCount++;
     }
 
@@ -473,20 +480,16 @@ window.selectBus = function () {
       lastRawLat = data.lat;
       lastRawLng = data.lng;
 
-      const pointObj = {
-        lat:       data.lat,
-        lng:       data.lng,
-        speed:     data.speed   || 0,
-        heading:   data.heading || 0,
-        updatedAt: fixTime,
-      };
-      enqueuePoint(pointObj);
-
       const thisRequestId = ++snapRequestId;
       snapToRoadWithTimeout(data.lat, data.lng).then(snapped => {
         if (thisRequestId !== snapRequestId) return;
-        pointObj.lat = snapped.lat;
-        pointObj.lng = snapped.lng;
+        enqueuePoint({
+          lat:       snapped.lat,
+          lng:       snapped.lng,
+          speed:     data.speed   || 0,
+          heading:   data.heading || 0,
+          updatedAt: fixTime,
+        });
       });
     }
 
