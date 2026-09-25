@@ -473,11 +473,6 @@ window.selectBus = function () {
       lastRawLat = data.lat;
       lastRawLng = data.lng;
 
-      if (shouldUpdateMarker) {
-      stationaryBreakCount = 0;
-      lastRawLat = data.lat;
-      lastRawLng = data.lng;
-
       const pointObj = {
         lat:       data.lat,
         lng:       data.lng,
