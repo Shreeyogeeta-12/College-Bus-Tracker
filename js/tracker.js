@@ -424,7 +424,7 @@ window.selectBus = function () {
       }
     }
 
-    if (!data || !data.lat || !data.lng || data.isActive === false) {
+    if (!data || !data.lat || !data.lng) {
       document.getElementById('info').innerText = '🔴 Bus is currently OFFLINE';
       if (etaLineEl) etaLineEl.innerText = '';
       if (busMarker) map.removeLayer(busMarker);
